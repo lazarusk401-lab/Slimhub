@@ -1,3 +1,10 @@
+Here is the complete, integrated **SlimHub** local script with the updated invisibility logic that keeps your physics and movement fully active while keeping you hidden.
+
+### Complete SlimHub Script (`LocalScript`)
+
+Place this inside a **`LocalScript`** inside **`StarterGui`** or **`StarterPlayerScripts`**.
+
+```lua
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
@@ -261,17 +268,17 @@ AddToggle(InvisControls, function(state)
     local character = GetCharacter()
     
     if Invisible then
-        -- Make character transparent locally while keeping physics intact
+        -- Set to 0.99 transparency so physics remain active and un-frozen
         for _, v in ipairs(character:GetDescendants()) do
             if v:IsA("BasePart") or v:IsA("Decal") then
                 if v.Name ~= "HumanoidRootPart" then
                     originalTransparencies[v] = v.Transparency
-                    v.Transparency = 1
+                    v.Transparency = 0.99
                 end
             end
         end
     else
-        -- Restore original visibility states cleanly
+        -- Cleanly restore visible states upon toggling off
         for part, originalValue in pairs(originalTransparencies) do
             if part and part.Parent then
                 part.Transparency = originalValue
@@ -345,7 +352,7 @@ task.spawn(function()
     end
 end)
 
--- --- FIXED DRAGGING SYSTEM ---
+-- --- DRAGGING SYSTEM ---
 local Dragging, DragInput, DragStart, StartPos
 
 local function UpdateDrag(input)
@@ -383,3 +390,5 @@ UIS.InputChanged:Connect(function(input)
         UpdateDrag(input)
     end
 end)
+
+```
