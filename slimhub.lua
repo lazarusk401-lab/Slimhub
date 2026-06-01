@@ -24,11 +24,9 @@ local HackSpeed = 100
 local IsMinimized = false
 local MenuOpen = true
 
--- Advanced Camera State Variables
+-- Advanced Camera & Drone Variables
 local SavedPosition = nil
-local CamX, CamY = 0, 0
-local VirtualCamPos = Vector3.zero
-local TargetCamPos = Vector3.zero
+local DroneNode = nil
 
 -- --- MODERN UI CREATION ---
 local Gui = Instance.new("ScreenGui")
@@ -254,44 +252,54 @@ AddToggle(SpeedControls, function(state)
     end
 end)
 
--- Underground Stealth Invisibility Row
+-- Underground Stealth Invisibility Row (Native Camera Mechanics Fixed)
 local InvisControls = CreateRow("Invisibility", 4)
 AddToggle(InvisControls, function(state)
     Invisible = state
     local character = GetCharacter()
     local root = character:FindFirstChild("HumanoidRootPart")
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
     
-    if not root then return end
+    if not root or not humanoid then return end
     
     if Invisible then
-        -- 1. Cache location and move character down
+        -- 1. Cache the starting position layout on the ground
         SavedPosition = root.CFrame
+        
+        -- 2. Create an invisible, anchored focus part for the native camera system to track
+        DroneNode = Instance.new("Part")
+        DroneNode.Name = "DroneTrackingNode"
+        DroneNode.Size = Vector3.new(1, 1, 1)
+        DroneNode.Transparency = 1
+        DroneNode.CanCollide = false
+        DroneNode.Anchored = true
+        DroneNode.CFrame = SavedPosition * CFrame.new(0, 2, 0)
+        DroneNode.Parent = workspace
+        
+        -- 3. Move the real character safely below the map out of sight
         root.CFrame = SavedPosition * CFrame.new(0, -100, 0)
         task.wait(0.05)
         root.Anchored = true
         
-        -- 2. Initialize orientation based on current camera look vector
-        local startCFrame = Camera.CFrame
-        local xAngle, yAngle, _ = startCFrame:ToEulerAnglesYXZ()
-        CamX = math.deg(xAngle)
-        CamY = math.deg(yAngle)
-        
-        VirtualCamPos = startCFrame.Position
-        TargetCamPos = VirtualCamPos
-        
-        -- 3. Shift camera to scriptable mode (Keep cursor unlocked by default)
-        Camera.CameraType = Enum.CameraType.Scriptable
-        UIS.MouseBehavior = Enum.MouseBehavior.Default
-    else
-        -- 1. Restore defaults
+        -- 4. Tell the native camera to follow our node instead of the player model
+        Camera.CameraSubject = DroneNode
         Camera.CameraType = Enum.CameraType.Custom
-        UIS.MouseBehavior = Enum.MouseBehavior.Default
+    else
+        -- 1. Point the engine back to tracking the humanoid model
+        Camera.CameraSubject = humanoid
+        Camera.CameraType = Enum.CameraType.Custom
         
-        -- 2. Return character to the surface position tracked by the script
+        -- 2. Teleport character safely back up to where the drone node traveled to
         root.Anchored = false
-        if SavedPosition then
+        if DroneNode and SavedPosition then
             local groundHeight = SavedPosition.Position.Y
-            root.CFrame = CFrame.new(VirtualCamPos.X, groundHeight, VirtualCamPos.Z)
+            root.CFrame = CFrame.new(DroneNode.Position.X, groundHeight, DroneNode.Position.Z)
+        end
+        
+        -- 3. Clean up the tracking node instance
+        if DroneNode then
+            DroneNode:Destroy()
+            DroneNode = nil
         end
         SavedPosition = nil
     end
@@ -320,54 +328,34 @@ end)
 
 -- --- MECHANICS LOOPS ---
 
--- Capture Mouse Input ONLY when holding Right Click
-UIS.InputChanged:Connect(function(input)
-    if not Invisible then return end
-    
-    -- Check if right mouse button is being held down to look around
-    if input.UserInputType == Enum.UserInputType.MouseMovement and UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
-        local sensitivity = 0.15
-        CamY = CamY - (input.Delta.X * sensitivity)
-        CamX = math.clamp(CamX - (input.Delta.Y * sensitivity), -85, 85)
-    end
-end)
-
--- Free-Look Rendering Loop
+-- Drone Node Locomotion Engine (Runs natively with standard camera look configurations)
 RunService.RenderStepped:Connect(function(deltaTime)
-    if not Invisible then return end
+    if not Invisible or not DroneNode then return end
     
-    -- Lock cursor dynamically only while holding right-click to look around, unlock when released
-    if UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
-        UIS.MouseBehavior = Enum.MouseBehavior.LockCurrentPosition
-    else
-        UIS.MouseBehavior = Enum.MouseBehavior.Default
-    end
-    
-    -- Generate rotation matrix from accumulated inputs
-    local cameraRotation = CFrame.Angles(0, math.rad(CamY), 0) * CFrame.Angles(math.rad(CamX), 0, 0)
-    
-    -- Handle positional updates
+    local cameraCFrame = Camera.CFrame
     local moveVector = Vector3.zero
-    if UIS:IsKeyDown(Enum.KeyCode.W) then moveVector += cameraRotation.LookVector end
-    if UIS:IsKeyDown(Enum.KeyCode.S) then moveVector -= cameraRotation.LookVector end
-    if UIS:IsKeyDown(Enum.KeyCode.A) then moveVector -= cameraRotation.RightVector end
-    if UIS:IsKeyDown(Enum.KeyCode.D) then moveVector += cameraRotation.RightVector end
+    
+    -- Track classic surface navigation inputs relative to where the camera faces
+    if UIS:IsKeyDown(Enum.KeyCode.W) then moveVector += cameraCFrame.LookVector end
+    if UIS:IsKeyDown(Enum.KeyCode.S) then moveVector -= cameraCFrame.LookVector end
+    if UIS:IsKeyDown(Enum.KeyCode.A) then moveVector -= cameraCFrame.RightVector end
+    if UIS:IsKeyDown(Enum.KeyCode.D) then moveVector += cameraCFrame.RightVector end
     
     local currentMoveSpeed = SpeedHack and HackSpeed or NormalSpeed
+    
     if moveVector.Magnitude > 0 then
-        TargetCamPos = TargetCamPos + (moveVector.Unit * currentMoveSpeed * deltaTime)
+        -- Standardize moving vectors flatly across the horizontal terrain
+        local flattenedDirection = Vector3.new(moveVector.X, 0, moveVector.Z).Unit
+        local targetPosition = DroneNode.Position + (flattenedDirection * currentMoveSpeed * deltaTime)
+        
+        -- Enforce matching surface layout limitations safely
+        if SavedPosition then
+            targetPosition = Vector3.new(targetPosition.X, SavedPosition.Position.Y + 2, targetPosition.Z)
+        end
+        
+        -- Smoothly slide the focus tracking node across the map
+        DroneNode.Position = DroneNode.Position:Lerp(targetPosition, math.clamp(deltaTime * 20, 0, 1))
     end
-    
-    -- Keep height constrained relative to the original surface plane
-    if SavedPosition then
-        TargetCamPos = Vector3.new(TargetCamPos.X, SavedPosition.Position.Y + 5, TargetCamPos.Z)
-    end
-    
-    -- Smoothly interpolate positions
-    VirtualCamPos = VirtualCamPos:Lerp(TargetCamPos, math.clamp(deltaTime * 12, 0, 1))
-    
-    -- Apply to viewport CFrame
-    Camera.CFrame = CFrame.new(VirtualCamPos) * cameraRotation
 end)
 
 -- Fly Engine
