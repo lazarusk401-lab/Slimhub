@@ -47,7 +47,7 @@ Gui.Parent = Player:WaitForChild("PlayerGui")
 local Frame = Instance.new("Frame")
 Frame.Size = UDim2.fromOffset(500, 380)
 Frame.Position = UDim2.new(0.5, 0, 0.5, 0)
-Frame.AnchorPoint = Vector2.new(0.5, 0.5) -- Perfect center pivoting
+Frame.AnchorPoint = Vector2.new(0.5, 0.5)
 Frame.BackgroundColor3 = Color3.fromRGB(11, 11, 14)
 Frame.BorderSizePixel = 0
 Frame.ClipsDescendants = true
@@ -159,15 +159,30 @@ local function CreateTabButton(name)
     Btn.Name = name:upper()
     
     local Label = Instance.new("TextLabel")
-    Label.Size = UDim2.new(1, -15, 1, 0)
-    Label.Position = UDim2.fromOffset(15, 0)
+    Label.Name = "TextLabel"
+    local padding = (name:lower() == "settings") and 30 or 15
+    Label.Size = UDim2.new(1, -padding, 1, 0)
+    Label.Position = UDim2.fromOffset(padding, 0)
     Label.BackgroundTransparency = 1
     Label.Font = Enum.Font.GothamMedium
     Label.TextSize = 12
     Label.Text = name:upper()
-    Label.TextColor3 = name == "Main" and Color3.fromRGB(0, 255, 150) or Color3.fromRGB(140, 140, 150)
+    Label.TextColor3 = (name == "Main") and Color3.fromRGB(0, 255, 150) or Color3.fromRGB(140, 140, 150)
     Label.TextXAlignment = Enum.TextXAlignment.Left
     Label.Parent = Btn
+    
+    if name:lower() == "settings" then
+        local FakeIcon = Instance.new("TextLabel")
+        FakeIcon.Size = UDim2.fromOffset(20, 40)
+        FakeIcon.Position = UDim2.fromOffset(5, 0)
+        FakeIcon.BackgroundTransparency = 1
+        FakeIcon.Text = "*"
+        FakeIcon.Font = Enum.Font.GothamBold
+        FakeIcon.TextSize = 18
+        FakeIcon.TextColor3 = Color3.fromRGB(140, 140, 150)
+        FakeIcon.TextYAlignment = Enum.TextYAlignment.Center
+        FakeIcon.Parent = Btn
+    end
     
     Btn.MouseButton1Click:Connect(function()
         ActiveTab = name
@@ -179,11 +194,19 @@ local function CreateTabButton(name)
             SettingsTabFrame.Visible = false
             if mainBtn and mainBtn:FindFirstChild("TextLabel") then mainBtn.TextLabel.TextColor3 = Color3.fromRGB(0, 255, 150) end
             if settingsBtn and settingsBtn:FindFirstChild("TextLabel") then settingsBtn.TextLabel.TextColor3 = Color3.fromRGB(140, 140, 150) end
+            if settingsBtn and settingsBtn:FindFirstChild("TextLabel") and settingsBtn:FindFirstChildOfClass("TextLabel") then
+                local icon = settingsBtn:FindFirstChildOfClass("TextLabel")
+                if icon and icon ~= settingsBtn:FindFirstChild("TextLabel") then icon.TextColor3 = Color3.fromRGB(140, 140, 150) end
+            end
         else
             MainTabFrame.Visible = false
             SettingsTabFrame.Visible = true
             if settingsBtn and settingsBtn:FindFirstChild("TextLabel") then settingsBtn.TextLabel.TextColor3 = Color3.fromRGB(0, 255, 150) end
             if mainBtn and mainBtn:FindFirstChild("TextLabel") then mainBtn.TextLabel.TextColor3 = Color3.fromRGB(140, 140, 150) end
+            if settingsBtn and settingsBtn:FindFirstChild("TextLabel") and settingsBtn:FindFirstChildOfClass("TextLabel") then
+                local icon = settingsBtn:FindFirstChildOfClass("TextLabel")
+                if icon and icon ~= settingsBtn:FindFirstChild("TextLabel") then icon.TextColor3 = Color3.fromRGB(0, 255, 150) end
+            end
         end
     end)
 end
