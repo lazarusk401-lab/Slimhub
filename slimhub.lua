@@ -279,8 +279,9 @@ AddToggle(InvisControls, function(state)
         VirtualCamPos = startCFrame.Position
         TargetCamPos = VirtualCamPos
         
-        -- 3. Shift camera to scriptable mode
+        -- 3. Shift camera to scriptable mode (Keep cursor unlocked by default)
         Camera.CameraType = Enum.CameraType.Scriptable
+        UIS.MouseBehavior = Enum.MouseBehavior.Default
     else
         -- 1. Restore defaults
         Camera.CameraType = Enum.CameraType.Custom
@@ -319,10 +320,12 @@ end)
 
 -- --- MECHANICS LOOPS ---
 
--- Capture Mouse Input Independently of MouseBehavior Restrictions
+-- Capture Mouse Input ONLY when holding Right Click
 UIS.InputChanged:Connect(function(input)
     if not Invisible then return end
-    if input.UserInputType == Enum.UserInputType.MouseMovement then
+    
+    -- Check if right mouse button is being held down to look around
+    if input.UserInputType == Enum.UserInputType.MouseMovement and UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
         local sensitivity = 0.15
         CamY = CamY - (input.Delta.X * sensitivity)
         CamX = math.clamp(CamX - (input.Delta.Y * sensitivity), -85, 85)
@@ -333,8 +336,12 @@ end)
 RunService.RenderStepped:Connect(function(deltaTime)
     if not Invisible then return end
     
-    -- Maintain center lock to allow continuous delta accumulation
-    UIS.MouseBehavior = Enum.MouseBehavior.LockCurrentPosition
+    -- Lock cursor dynamically only while holding right-click to look around, unlock when released
+    if UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
+        UIS.MouseBehavior = Enum.MouseBehavior.LockCurrentPosition
+    else
+        UIS.MouseBehavior = Enum.MouseBehavior.Default
+    end
     
     -- Generate rotation matrix from accumulated inputs
     local cameraRotation = CFrame.Angles(0, math.rad(CamY), 0) * CFrame.Angles(math.rad(CamX), 0, 0)
