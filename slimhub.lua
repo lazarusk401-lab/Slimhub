@@ -17,6 +17,9 @@ local Flying = false
 local Noclip = false
 local SpeedHack = false
 local Invisible = false
+local InfiniteJump = false
+local ClickTP = false
+local ESPEnabled = false
 
 local FlySpeed = 50
 local NormalSpeed = 16
@@ -36,6 +39,9 @@ local ActiveTab = "Main"
 -- Advanced Camera & Drone Variables
 local SavedPosition = nil
 local DroneNode = nil
+
+-- Cache for ESP Drawings
+local ESPCache = {}
 
 -- --- MODERN UI CREATION (NEON/CYBER THEME) ---
 local Gui = Instance.new("ScreenGui")
@@ -120,7 +126,7 @@ ContentArea.Parent = Frame
 local MainTabFrame = Instance.new("ScrollingFrame")
 MainTabFrame.Size = UDim2.fromScale(1, 1)
 MainTabFrame.BackgroundTransparency = 1
-MainTabFrame.CanvasSize = UDim2.fromScale(0, 1.2)
+MainTabFrame.CanvasSize = UDim2.fromScale(0, 1.6)
 MainTabFrame.ScrollBarThickness = 2
 MainTabFrame.Visible = true
 MainTabFrame.Parent = ContentArea
@@ -414,6 +420,24 @@ AddToggle(InvisControls, "Invis", function(state)
     end
 end)
 
+-- NEW FEATURE ROWS IN MAIN TAB
+local InfJumpControls = CreateRow("Infinite Jump", MainTabFrame)
+AddToggle(InfJumpControls, "InfJump", function(state) InfiniteJump = state end)
+
+local ClickTPControls = CreateRow("Click Teleport", MainTabFrame)
+AddToggle(ClickTPControls, "ClickTP", function(state) ClickTP = state end)
+
+local ESPControls = CreateRow("Player ESP", MainTabFrame)
+AddToggle(ESPControls, "ESP", function(state) 
+    ESPEnabled = state 
+    if not state then
+        for _, drawings in pairs(ESPCache) do
+            drawings.Box.Visible = false
+            drawings.Name.Visible = false
+        end
+    end
+end)
+
 -- SETTINGS TAB CONTROLS
 local UIKeybindRow = CreateRow("UI Menu Toggle Bind", SettingsTabFrame)
 AddKeybindButton(UIKeybindRow, MenuKeybind, function(newKey) MenuKeybind = newKey end)
@@ -479,31 +503,96 @@ MinCircle.MouseButton1Click:Connect(function()
     })
 end)
 
+-- --- UTILITY ESP ENGINE CREATION ---
+local function CreateESP(p)
+    if ESPCache[p] then return end
+    
+    local box = Drawing.new("Square")
+    box.Thickness = 1
+    box.Color = Color3.fromRGB(0, 255, 150)
+    box.Filled = false
+    box.Visible = false
+    
+    local name = Drawing.new("Text")
+    name.Size = 13
+    name.Center = true
+    name.Outline = true
+    name.Color = Color3.fromRGB(255, 255, 255)
+    name.Visible = false
+    
+    ESPCache[p] = {Box = box, Name = name}
+end
+
+local function RemoveESP(p)
+    if ESPCache[p] then
+        ESPCache[p].Box:Remove()
+        ESPCache[p].Name:Remove()
+        ESPCache[p] = nil
+    end
+end
+
+Players.PlayerAdded:Connect(CreateESP)
+Players.PlayerRemoving:Connect(RemoveESP)
+for _, p in ipairs(Players:GetPlayers()) do
+    if p ~= Player then CreateESP(p) end
+end
+
 -- --- MECHANICS LOOPS ---
 
--- Drone Positioning Logic (High Speed Response Engine)
+-- Combined Render Loop (Drone Navigation + ESP Framework)
 RunService.RenderStepped:Connect(function(deltaTime)
-    if not Invisible or not DroneNode then return end
-    
-    local cameraCFrame = Camera.CFrame
-    local moveVector = Vector3.zero
-    
-    if UIS:IsKeyDown(Enum.KeyCode.W) then moveVector += cameraCFrame.LookVector end
-    if UIS:IsKeyDown(Enum.KeyCode.S) then moveVector -= cameraCFrame.LookVector end
-    if UIS:IsKeyDown(Enum.KeyCode.A) then moveVector -= cameraCFrame.RightVector end
-    if UIS:IsKeyDown(Enum.KeyCode.D) then moveVector += cameraCFrame.RightVector end
-    
-    local speedMultiplier = SpeedHack and HackSpeed or DroneSpeed
-    
-    if moveVector.Magnitude > 0 then
-        local flattenedDirection = Vector3.new(moveVector.X, 0, moveVector.Z).Unit
-        local targetPosition = DroneNode.Position + (flattenedDirection * speedMultiplier * deltaTime)
+    -- Drone Positioning Logic
+    if Invisible and DroneNode then
+        local cameraCFrame = Camera.CFrame
+        local moveVector = Vector3.zero
         
-        if SavedPosition then
-            targetPosition = Vector3.new(targetPosition.X, SavedPosition.Position.Y + 2, targetPosition.Z)
+        if UIS:IsKeyDown(Enum.KeyCode.W) then moveVector += cameraCFrame.LookVector end
+        if UIS:IsKeyDown(Enum.KeyCode.S) then moveVector -= cameraCFrame.LookVector end
+        if UIS:IsKeyDown(Enum.KeyCode.A) then moveVector -= cameraCFrame.RightVector end
+        if UIS:IsKeyDown(Enum.KeyCode.D) then moveVector += cameraCFrame.RightVector end
+        
+        local speedMultiplier = SpeedHack and HackSpeed or DroneSpeed
+        
+        if moveVector.Magnitude > 0 then
+            local flattenedDirection = Vector3.new(moveVector.X, 0, moveVector.Z).Unit
+            local targetPosition = DroneNode.Position + (flattenedDirection * speedMultiplier * deltaTime)
+            
+            if SavedPosition then
+                targetPosition = Vector3.new(targetPosition.X, SavedPosition.Position.Y + 2, targetPosition.Z)
+            end
+            
+            DroneNode.Position = DroneNode.Position:Lerp(targetPosition, math.clamp(deltaTime * 24, 0, 1))
         end
+    end
+
+    -- Core Drawing Rendering Engine for Player ESP
+    for p, drawings in pairs(ESPCache) do
+        local box = drawings.Box
+        local name = drawings.Name
         
-        DroneNode.Position = DroneNode.Position:Lerp(targetPosition, math.clamp(deltaTime * 24, 0, 1))
+        if ESPEnabled and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChildOfClass("Humanoid") and p.Character:FindFirstChildOfClass("Humanoid").Health > 0 then
+            local rootPart = p.Character.HumanoidRootPart
+            local pos, onScreen = Camera:WorldToViewportPoint(rootPart.Position)
+            
+            if onScreen then
+                local sizeHeight = (Camera:WorldToViewportPoint(rootPart.Position + Vector3.new(0, 3, 0)).Y - Camera:WorldToViewportPoint(rootPart.Position - Vector3.new(0, 3, 0)).Y)
+                local sizeWidth = sizeHeight * 0.6
+                
+                box.Size = Vector2.new(math.abs(sizeWidth), math.abs(sizeHeight))
+                box.Position = Vector2.new(pos.X - box.Size.X / 2, pos.Y - box.Size.Y / 2)
+                box.Visible = true
+                
+                name.Text = p.Name:upper()
+                name.Position = Vector2.new(pos.X, (pos.Y - box.Size.Y / 2) - 15)
+                name.Visible = true
+            else
+                box.Visible = false
+                name.Visible = false
+            end
+        else
+            box.Visible = false
+            name.Visible = false
+        end
     end
 end)
 
@@ -537,6 +626,39 @@ RunService.Stepped:Connect(function()
     local Character = GetCharacter()
     for _, v in ipairs(Character:GetDescendants()) do
         if v:IsA("BasePart") then v.CanCollide = false end
+    end
+end)
+
+-- Infinite Jump Pipeline Integration
+UIS.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if InfiniteJump and input.KeyCode == Enum.KeyCode.Space then
+        local char = GetCharacter()
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if hum then
+            hum:ChangeState(Enum.HumanoidStateType.Jumping)
+        end
+    end
+end)
+
+-- Click Teleport Mechanics Processor
+UIS.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if ClickTP and input.UserInputType == Enum.UserInputType.MouseButton1 and UIS:IsKeyDown(Enum.KeyCode.LeftControl) then
+        local char = GetCharacter()
+        local root = char:FindFirstChild("HumanoidRootPart")
+        if root then
+            local mousePosition = UIS:GetMouseLocation()
+            local ray = Camera:ViewportPointToRay(mousePosition.X, mousePosition.Y)
+            local raycastParams = RaycastParams.new()
+            raycastParams.FilterDescendantsInstances = {char}
+            raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+            
+            local result = workspace:Raycast(ray.Origin, ray.Direction * 1000, raycastParams)
+            if result then
+                root.CFrame = CFrame.new(result.Position + Vector3.new(0, 3, 0))
+            end
+        end
     end
 end)
 
