@@ -290,7 +290,7 @@ local function AddSlider(controls, min, max, default, callback)
     Fill.Parent = SliderFrame
     Instance.new("UICorner", Fill).CornerRadius = UDim.new(1, 0)
     
-    local Trigger = Instance.new("TextButton")
+    local Trigger = instance.new("TextButton")
     Trigger.Size = UDim2.new(1, 20, 3, 0)
     Trigger.Position = UDim2.new(0, -10, -1, 0)
     Trigger.BackgroundTransparency = 1
@@ -445,8 +445,8 @@ local ClickTPControls = CreateRow("Click Teleport", MainTabFrame)
 AddToggle(ClickTPControls, "ClickTP", function(state) ClickTP = state end)
 
 
--- ESP TAB CONTROLS (REGISTERED CORRECTLY TO ESPTABFRAME)
-local MasterESPControls = CreateRow("Enable ESP Master", ESPTabFrame)
+-- ESP TAB CONTROLS (ROW RENAMED TO ESP)
+local MasterESPControls = CreateRow("ESP", ESPTabFrame)
 AddToggle(MasterESPControls, "ESP", function(state) 
     ESPEnabled = state 
     if not state then
@@ -610,6 +610,10 @@ RunService.RenderStepped:Connect(function(deltaTime)
         end
     end
 
+    -- Get Local Player's world root position for accurate tracers
+    local localChar = Player.Character
+    local localRoot = localChar and localChar:FindFirstChild("HumanoidRootPart")
+
     -- Core Drawing Rendering Engine for Player ESP
     for p, drawings in pairs(ESPCache) do
         local box = drawings.Box
@@ -634,8 +638,15 @@ RunService.RenderStepped:Connect(function(deltaTime)
                 name.Position = Vector2.new(pos.X, (pos.Y - box.Size.Y / 2) - 15)
                 name.Visible = true
 
-                if ESPTracers then
-                    tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+                -- FIXED ACCURATE 3D WORLD-TO-SCREEN TRACERS (Me to Player)
+                if ESPTracers and localRoot then
+                    local myPos, myOnScreen = Camera:WorldToViewportPoint(localRoot.Position)
+                    if myOnScreen then
+                        tracer.From = Vector2.new(myPos.X, myPos.Y)
+                    else
+                        -- Fallback to bottom center screen if your own character root goes off-screen (e.g. extreme camera zoom/angles)
+                        tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+                    end
                     tracer.To = Vector2.new(pos.X, pos.Y)
                     tracer.Thickness = ESPSize
                     tracer.Color = currentESPColor
