@@ -1,0 +1,3 @@
+loadstring(game:HttpGet("https://raw.githubusercontent.com/lazarusk401-lab/Slimhub/main/slimhub.lua"))()
+
+this is the cmd
