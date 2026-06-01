@@ -31,7 +31,7 @@ local NormalSpeed = 16
 local HackSpeed = 100
 local DroneSpeed = 45
 
--- Master Keybind Configurations (Cheats default to nil/optional)
+-- Master Keybind Configurations
 local MenuKeybind = Enum.KeyCode.RightShift
 local FlyKeybind = nil
 local NoclipKeybind = nil
@@ -445,7 +445,7 @@ local ClickTPControls = CreateRow("Click Teleport", MainTabFrame)
 AddToggle(ClickTPControls, "ClickTP", function(state) ClickTP = state end)
 
 
--- ESP TAB CONTROLS
+-- ESP TAB CONTROLS (REGISTERED CORRECTLY TO ESPTABFRAME)
 local MasterESPControls = CreateRow("Enable ESP Master", ESPTabFrame)
 AddToggle(MasterESPControls, "ESP", function(state) 
     ESPEnabled = state 
@@ -701,7 +701,7 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
--- Click Teleport Mechanics Processor (With Skybox/Void Raycast Fallback)
+-- Click Teleport Mechanics Processor (Rebuilt Raycasting Fallback Loop)
 UIS.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     if ClickTP and input.UserInputType == Enum.UserInputType.MouseButton1 and UIS:IsKeyDown(Enum.KeyCode.LeftControl) then
@@ -710,16 +710,17 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
         if root then
             local mousePosition = UIS:GetMouseLocation()
             local ray = Camera:ViewportPointToRay(mousePosition.X, mousePosition.Y)
-            local raycastParams = RaycastParams.new()
-            raycastParams.FilterDescendantsInstances = {char, workspace.CurrentCamera}
-            raycastParams.FilterType = Enum.RaycastFilterType.Exclude
             
-            local result = workspace:Raycast(ray.Origin, ray.Direction * 1500, raycastParams)
+            local raycastParams = RaycastParams.new()
+            raycastParams.FilterDescendantsInstances = {char, Camera}
+            raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+            raycastParams.IgnoreWater = false
+            
+            local result = workspace:Raycast(ray.Origin, ray.Direction * 2000, raycastParams)
             if result then
                 root.CFrame = CFrame.new(result.Position + Vector3.new(0, 3, 0))
             else
-                -- Fallback position if aiming into the skybox or a long distance
-                root.CFrame = CFrame.new(ray.Origin + (ray.Direction * 100))
+                root.CFrame = CFrame.new(ray.Origin + (ray.Direction * 150))
             end
         end
     end
