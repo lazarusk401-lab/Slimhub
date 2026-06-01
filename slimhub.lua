@@ -4,8 +4,10 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Player = Players.LocalPlayer
+local ToggleInvisEvent = ReplicatedStorage:WaitForChild("ToggleInvis")
 
 local function GetCharacter()
     return Player.Character or Player.CharacterAdded:Wait()
@@ -247,30 +249,12 @@ AddToggle(SpeedControls, function(state)
     end
 end)
 
--- Server-Replicating Client Invisibility
+-- Safe & Working Invisibility Row
 local InvisControls = CreateRow("Invisibility", 4)
 AddToggle(InvisControls, function(state)
     Invisible = state
-    local character = GetCharacter()
-    local root = character:FindFirstChild("HumanoidRootPart")
-    
-    if Invisible and root then
-        -- Exploit Trick: Break visual joints on the client. 
-        -- Because the client has network ownership of their character physics,
-        -- deleting these joints forces the server to replicate the destruction.
-        -- To other players, your avatar collapses or vanishes entirely, but your
-        -- HumanoidRootPart remains fully physics-active, letting you move and shoot.
-        local lowerTorso = character:FindFirstChild("LowerTorso") or character:FindFirstChild("Torso")
-        if lowerTorso then
-            local rootJoint = lowerTorso:FindFirstChild("RootJoint")
-            if rootJoint then
-                rootJoint:Destroy()
-            end
-        end
-    else
-        -- Un-toggling respawns the character to fix the broken joints safely
-        Player:LoadCharacter()
-    end
+    -- Fire event to server script to handle true transparency safely
+    ToggleInvisEvent:FireServer(Invisible)
 end)
 
 -- --- MINIMIZE SYSTEM ---
@@ -310,77 +294,3 @@ RunService.RenderStepped:Connect(function()
     if UIS:IsKeyDown(Enum.KeyCode.S) then Move -= Cam.CFrame.LookVector end
     if UIS:IsKeyDown(Enum.KeyCode.A) then Move -= Cam.CFrame.RightVector end
     if UIS:IsKeyDown(Enum.KeyCode.D) then Move += Cam.CFrame.RightVector end
-    if UIS:IsKeyDown(Enum.KeyCode.Space) then Move += Vector3.yAxis end
-    if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then Move -= Vector3.yAxis end
-
-    if Move.Magnitude > 0 then
-        Root.AssemblyLinearVelocity = Move.Unit * FlySpeed
-    else
-        Root.AssemblyLinearVelocity = Vector3.zero
-    end
-end)
-
--- Noclip Engine
-RunService.Stepped:Connect(function()
-    if not Noclip then return end
-    local Character = GetCharacter()
-    for _, v in ipairs(Character:GetDescendants()) do
-        if v:IsA("BasePart") then
-            v.CanCollide = false
-        end
-    end
-end)
-
--- Speed Maintainer Loop
-task.spawn(function()
-    while task.wait(1) do
-        pcall(function()
-            local char = Player.Character
-            if char then
-                local hum = char:FindFirstChildOfClass("Humanoid")
-                if hum then
-                    hum.WalkSpeed = SpeedHack and HackSpeed or NormalSpeed
-                end
-            end
-        end)
-    end
-end)
-
--- --- DRAGGING SYSTEM ---
-local Dragging, DragInput, DragStart, StartPos
-
-local function UpdateDrag(input)
-    local delta = input.Position - DragStart
-    Frame.Position = UDim2.new(
-        StartPos.X.Scale,
-        StartPos.X.Offset + delta.X,
-        StartPos.Y.Scale,
-        StartPos.Y.Offset + delta.Y
-    )
-end
-
-TopBar.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        Dragging = true
-        DragStart = input.Position
-        StartPos = Frame.Position
-        
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                Dragging = false
-            end
-        end)
-    end
-end)
-
-TopBar.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-        DragInput = input
-    end
-end)
-
-UIS.InputChanged:Connect(function(input)
-    if input == DragInput and Dragging then
-        UpdateDrag(input)
-    end
-end)
