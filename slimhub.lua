@@ -19,7 +19,12 @@ local SpeedHack = false
 local Invisible = false
 local InfiniteJump = false
 local ClickTP = false
+
+-- ESP Configuration States
 local ESPEnabled = false
+local ESPTracers = false
+local ESPRainbow = false
+local ESPSize = 1
 
 local FlySpeed = 50
 local NormalSpeed = 16
@@ -42,6 +47,7 @@ local DroneNode = nil
 
 -- Cache for ESP Drawings
 local ESPCache = {}
+local RainbowHue = 0
 
 -- --- MODERN UI CREATION (NEON/CYBER THEME) ---
 local Gui = Instance.new("ScreenGui")
@@ -126,13 +132,24 @@ ContentArea.Parent = Frame
 local MainTabFrame = Instance.new("ScrollingFrame")
 MainTabFrame.Size = UDim2.fromScale(1, 1)
 MainTabFrame.BackgroundTransparency = 1
-MainTabFrame.CanvasSize = UDim2.fromScale(0, 1.6)
+MainTabFrame.CanvasSize = UDim2.fromScale(0, 1.4)
 MainTabFrame.ScrollBarThickness = 2
 MainTabFrame.Visible = true
 MainTabFrame.Parent = ContentArea
 
 local MainLayout = Instance.new("UIListLayout", MainTabFrame)
 MainLayout.Padding = UDim.new(0, 10)
+
+local ESPTabFrame = Instance.new("ScrollingFrame")
+ESPTabFrame.Size = UDim2.fromScale(1, 1)
+ESPTabFrame.BackgroundTransparency = 1
+ESPTabFrame.CanvasSize = UDim2.fromScale(0, 1.4)
+ESPTabFrame.ScrollBarThickness = 2
+ESPTabFrame.Visible = false
+ESPTabFrame.Parent = ContentArea
+
+local ESPLayout = Instance.new("UIListLayout", ESPTabFrame)
+ESPLayout.Padding = UDim.new(0, 10)
 
 local SettingsTabFrame = Instance.new("ScrollingFrame")
 SettingsTabFrame.Size = UDim2.fromScale(1, 1)
@@ -178,19 +195,19 @@ local function CreateTabButton(name)
     
     Btn.MouseButton1Click:Connect(function()
         ActiveTab = name
-        local mainBtn = Sidebar:FindFirstChild("MAIN")
-        local settingsBtn = Sidebar:FindFirstChild("SETTINGS")
         
-        if ActiveTab == "Main" then
-            MainTabFrame.Visible = true
-            SettingsTabFrame.Visible = false
-            if mainBtn and mainBtn:FindFirstChild("TextLabel") then mainBtn.TextLabel.TextColor3 = Color3.fromRGB(0, 255, 150) end
-            if settingsBtn and settingsBtn:FindFirstChild("TextLabel") then settingsBtn.TextLabel.TextColor3 = Color3.fromRGB(140, 140, 150) end
-        else
-            MainTabFrame.Visible = false
-            SettingsTabFrame.Visible = true
-            if settingsBtn and settingsBtn:FindFirstChild("TextLabel") then settingsBtn.TextLabel.TextColor3 = Color3.fromRGB(0, 255, 150) end
-            if mainBtn and mainBtn:FindFirstChild("TextLabel") then mainBtn.TextLabel.TextColor3 = Color3.fromRGB(140, 140, 150) end
+        MainTabFrame.Visible = (ActiveTab == "Main")
+        ESPTabFrame.Visible = (ActiveTab == "ESP")
+        SettingsTabFrame.Visible = (ActiveTab == "Settings")
+        
+        for _, sidebarChild in ipairs(Sidebar:GetChildren()) do
+            if sidebarChild:IsA("TextButton") and sidebarChild:FindFirstChild("TextLabel") then
+                if sidebarChild.Name == ActiveTab:upper() then
+                    sidebarChild.TextLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
+                else
+                    sidebarChild.TextLabel.TextColor3 = Color3.fromRGB(140, 140, 150)
+                end
+            end
         end
     end)
 end
@@ -352,6 +369,7 @@ end
 
 -- --- BUILD TABS ---
 CreateTabButton("Main")
+CreateTabButton("ESP")
 CreateTabButton("Settings")
 
 -- MAIN TAB CONTROLS
@@ -420,23 +438,40 @@ AddToggle(InvisControls, "Invis", function(state)
     end
 end)
 
--- NEW FEATURE ROWS IN MAIN TAB
 local InfJumpControls = CreateRow("Infinite Jump", MainTabFrame)
 AddToggle(InfJumpControls, "InfJump", function(state) InfiniteJump = state end)
 
 local ClickTPControls = CreateRow("Click Teleport", MainTabFrame)
 AddToggle(ClickTPControls, "ClickTP", function(state) ClickTP = state end)
 
-local ESPControls = CreateRow("Player ESP", MainTabFrame)
-AddToggle(ESPControls, "ESP", function(state) 
+
+-- ESP TAB CONTROLS
+local MasterESPControls = CreateRow("Enable ESP Master", ESPTabFrame)
+AddToggle(MasterESPControls, "ESP", function(state) 
     ESPEnabled = state 
     if not state then
         for _, drawings in pairs(ESPCache) do
             drawings.Box.Visible = false
             drawings.Name.Visible = false
+            drawings.Tracer.Visible = false
         end
     end
 end)
+
+local TracerControls = CreateRow("ESP Tracers", ESPTabFrame)
+AddToggle(TracerControls, "Tracers", function(state)
+    ESPTracers = state
+    if not state then
+        for _, drawings in pairs(ESPCache) do drawings.Tracer.Visible = false end
+    end
+end)
+
+local RainbowControls = CreateRow("Rainbow Mode", ESPTabFrame)
+AddToggle(RainbowControls, "Rainbow", function(state) ESPRainbow = state end)
+
+local LineSizeControls = CreateRow("Line Thickness", ESPTabFrame)
+AddSlider(LineSizeControls, 1, 5, ESPSize, function(val) ESPSize = val end)
+
 
 -- SETTINGS TAB CONTROLS
 local UIKeybindRow = CreateRow("UI Menu Toggle Bind", SettingsTabFrame)
@@ -519,14 +554,20 @@ local function CreateESP(p)
     name.Outline = true
     name.Color = Color3.fromRGB(255, 255, 255)
     name.Visible = false
+
+    local tracer = Drawing.new("Line")
+    tracer.Thickness = 1
+    tracer.Color = Color3.fromRGB(0, 255, 150)
+    tracer.Visible = false
     
-    ESPCache[p] = {Box = box, Name = name}
+    ESPCache[p] = {Box = box, Name = name, Tracer = tracer}
 end
 
 local function RemoveESP(p)
     if ESPCache[p] then
         ESPCache[p].Box:Remove()
         ESPCache[p].Name:Remove()
+        ESPCache[p].Tracer:Remove()
         ESPCache[p] = nil
     end
 end
@@ -541,6 +582,10 @@ end
 
 -- Combined Render Loop (Drone Navigation + ESP Framework)
 RunService.RenderStepped:Connect(function(deltaTime)
+    -- Cycle hue value for Rainbow Mode
+    RainbowHue = (RainbowHue + deltaTime * 0.1) % 1
+    local currentESPColor = ESPRainbow and Color3.fromHSV(RainbowHue, 1, 1) or Color3.fromRGB(0, 255, 150)
+
     -- Drone Positioning Logic
     if Invisible and DroneNode then
         local cameraCFrame = Camera.CFrame
@@ -569,6 +614,7 @@ RunService.RenderStepped:Connect(function(deltaTime)
     for p, drawings in pairs(ESPCache) do
         local box = drawings.Box
         local name = drawings.Name
+        local tracer = drawings.Tracer
         
         if ESPEnabled and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChildOfClass("Humanoid") and p.Character:FindFirstChildOfClass("Humanoid").Health > 0 then
             local rootPart = p.Character.HumanoidRootPart
@@ -580,18 +626,32 @@ RunService.RenderStepped:Connect(function(deltaTime)
                 
                 box.Size = Vector2.new(math.abs(sizeWidth), math.abs(sizeHeight))
                 box.Position = Vector2.new(pos.X - box.Size.X / 2, pos.Y - box.Size.Y / 2)
+                box.Thickness = ESPSize
+                box.Color = currentESPColor
                 box.Visible = true
                 
                 name.Text = p.Name:upper()
                 name.Position = Vector2.new(pos.X, (pos.Y - box.Size.Y / 2) - 15)
                 name.Visible = true
+
+                if ESPTracers then
+                    tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+                    tracer.To = Vector2.new(pos.X, pos.Y)
+                    tracer.Thickness = ESPSize
+                    tracer.Color = currentESPColor
+                    tracer.Visible = true
+                else
+                    tracer.Visible = false
+                end
             else
                 box.Visible = false
                 name.Visible = false
+                tracer.Visible = false
             end
         else
             box.Visible = false
             name.Visible = false
+            tracer.Visible = false
         end
     end
 end)
@@ -641,7 +701,7 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
--- Click Teleport Mechanics Processor
+-- Click Teleport Mechanics Processor (With Skybox/Void Raycast Fallback)
 UIS.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     if ClickTP and input.UserInputType == Enum.UserInputType.MouseButton1 and UIS:IsKeyDown(Enum.KeyCode.LeftControl) then
@@ -651,12 +711,15 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
             local mousePosition = UIS:GetMouseLocation()
             local ray = Camera:ViewportPointToRay(mousePosition.X, mousePosition.Y)
             local raycastParams = RaycastParams.new()
-            raycastParams.FilterDescendantsInstances = {char}
+            raycastParams.FilterDescendantsInstances = {char, workspace.CurrentCamera}
             raycastParams.FilterType = Enum.RaycastFilterType.Exclude
             
-            local result = workspace:Raycast(ray.Origin, ray.Direction * 1000, raycastParams)
+            local result = workspace:Raycast(ray.Origin, ray.Direction * 1500, raycastParams)
             if result then
                 root.CFrame = CFrame.new(result.Position + Vector3.new(0, 3, 0))
+            else
+                -- Fallback position if aiming into the skybox or a long distance
+                root.CFrame = CFrame.new(ray.Origin + (ray.Direction * 100))
             end
         end
     end
