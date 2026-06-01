@@ -1,9 +1,12 @@
+task.wait(1)
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 
 local Player = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
 
 local function GetCharacter()
     return Player.Character or Player.CharacterAdded:Wait()
@@ -19,17 +22,18 @@ local FlySpeed = 50
 local NormalSpeed = 16
 local HackSpeed = 100
 local IsMinimized = false
+local MenuOpen = true
 
--- Track original transparencies for restoring visibility
-local originalTransparencies = {}
+-- Invisibility State Variables
+local SavedPosition = nil
+local VirtualCamCFrame = CFrame.new()
 
 -- --- MODERN UI CREATION ---
 local Gui = Instance.new("ScreenGui")
 Gui.Name = "SlimHub"
 Gui.ResetOnSpawn = false
-Gui.Parent = Player.PlayerGui
+Gui.Parent = Player:WaitForChild("PlayerGui")
 
--- Main Panel
 local Frame = Instance.new("Frame")
 Frame.Size = UDim2.fromOffset(420, 360)
 Frame.Position = UDim2.new(0.5, -210, 0.5, -180)
@@ -43,7 +47,6 @@ local Stroke = Instance.new("UIStroke", Frame)
 Stroke.Color = Color3.fromRGB(40, 40, 45)
 Stroke.Thickness = 1.5
 
--- Top Bar / Drag Handle
 local TopBar = Instance.new("Frame")
 TopBar.Size = UDim2.new(1, 0, 0, 45)
 TopBar.BackgroundColor3 = Color3.fromRGB(22, 22, 26)
@@ -64,14 +67,13 @@ local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, -60, 1, 0)
 Title.Position = UDim2.fromOffset(15, 0)
 Title.BackgroundTransparency = 1
-Title.Text = "SLIMHUB // CLIENT"
+Title.Text = "SLIMHUB // CLIENT [RSHIFT]"
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 16
 Title.TextColor3 = Color3.fromRGB(0, 255, 130)
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Parent = TopBar
 
--- Minimize Button
 local MinBtn = Instance.new("TextButton")
 MinBtn.Size = UDim2.fromOffset(30, 30)
 MinBtn.Position = UDim2.new(1, -40, 0.5, -15)
@@ -82,7 +84,6 @@ MinBtn.TextSize = 20
 MinBtn.TextColor3 = Color3.fromRGB(150, 150, 155)
 MinBtn.Parent = TopBar
 
--- UI Layout Container
 local Container = Instance.new("Frame")
 Container.Size = UDim2.new(1, -30, 1, -65)
 Container.Position = UDim2.fromOffset(15, 55)
@@ -226,16 +227,13 @@ end
 
 -- --- BUILDING THE INTERFACE ---
 
--- Fly Row
 local FlyControls = CreateRow("Fly Hack", 1)
 AddSlider(FlyControls, 16, 250, FlySpeed, function(val) FlySpeed = val end)
 AddToggle(FlyControls, function(state) Flying = state end)
 
--- Noclip Row
 local NoclipControls = CreateRow("Noclip", 2)
 AddToggle(NoclipControls, function(state) Noclip = state end)
 
--- Speed Row
 local SpeedControls = CreateRow("Speed Hack", 3)
 AddSlider(SpeedControls, 16, 150, HackSpeed, function(val)
     HackSpeed = val
@@ -254,30 +252,40 @@ AddToggle(SpeedControls, function(state)
     end
 end)
 
--- Invisibility Row
+-- Underground Stealth Invisibility Row
 local InvisControls = CreateRow("Invisibility", 4)
 AddToggle(InvisControls, function(state)
     Invisible = state
     local character = GetCharacter()
+    local root = character:FindFirstChild("HumanoidRootPart")
+    
+    if not root then return end
     
     if Invisible then
-        -- Set to 0.99 transparency so physics remain active and un-frozen
-        for _, v in ipairs(character:GetDescendants()) do
-            if v:IsA("BasePart") or v:IsA("Decal") then
-                if v.Name ~= "HumanoidRootPart" then
-                    originalTransparencies[v] = v.Transparency
-                    v.Transparency = 0.99
-                end
-            end
-        end
+        -- 1. Cache the exact surface location and initial camera orientation
+        SavedPosition = root.CFrame
+        VirtualCamCFrame = Camera.CFrame
+        
+        -- 2. Drop the physical character 100 studs below the map and anchor it
+        root.CFrame = SavedPosition * CFrame.new(0, -100, 0)
+        task.wait(0.1)
+        root.Anchored = true
+        
+        -- 3. Detach the camera from the player model
+        Camera.CameraType = Enum.CameraType.Scriptable
     else
-        -- Cleanly restore visible states upon toggling off
-        for part, originalValue in pairs(originalTransparencies) do
-            if part and part.Parent then
-                part.Transparency = originalValue
-            end
+        -- 1. Re-attach the camera back to normal tracking mode
+        Camera.CameraType = Enum.CameraType.Custom
+        
+        -- 2. Unanchor and teleport the character back to where the camera is looking on the surface
+        root.Anchored = false
+        if SavedPosition then
+            -- Projects the player onto the floor location tracking beneath the virtual camera
+            local groundHeight = SavedPosition.Position.Y
+            root.CFrame = CFrame.new(VirtualCamCFrame.Position.X, groundHeight, VirtualCamCFrame.Position.Z)
         end
-        table.clear(originalTransparencies)
+        
+        SavedPosition = nil
     end
 end)
 
@@ -293,11 +301,50 @@ MinBtn.MouseButton1Click:Connect(function()
     end
 end)
 
+-- --- KEYBIND TO SHOW/HIDE CLIENT (RSHIFT) ---
+UIS.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.RightShift then
+        MenuOpen = not MenuOpen
+        Frame.Visible = MenuOpen
+    end
+end)
+
 -- --- MECHANICS LOOPS ---
+
+-- Camera Control & Navigation Loop for Invisibility Mode
+RunService.RenderStepped:Connect(function()
+    if not Invisible then return end
+    
+    -- Capture mouse delta rotation smoothly while right click is held
+    local delta = UIS:GetMouseDelta()
+    local camSpeed = (SpeedHack and HackSpeed or NormalSpeed) * 0.03
+    
+    local moveDirection = Vector3.zero
+    if UIS:IsKeyDown(Enum.KeyCode.W) then moveDirection += VirtualCamCFrame.LookVector end
+    if UIS:IsKeyDown(Enum.KeyCode.S) then moveDirection -= VirtualCamCFrame.LookVector end
+    if UIS:IsKeyDown(Enum.KeyCode.A) then moveDirection -= VirtualCamCFrame.RightVector end
+    if UIS:IsKeyDown(Enum.KeyCode.D) then moveDirection += VirtualCamCFrame.RightVector end
+    
+    -- Keep the camera height relative to the original surface floor layout
+    local currentPos = VirtualCamCFrame.Position + (moveDirection * camSpeed)
+    if SavedPosition then
+        currentPos = Vector3.new(currentPos.X, SavedPosition.Position.Y + 5, currentPos.Z)
+    end
+    
+    -- Update virtual rotation look matrix if user is steering the mouse
+    local rotation = VirtualCamCFrame - VirtualCamCFrame.Position
+    if UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
+        rotation = rotation * CFrame.Angles(0, math.rad(-delta.X * 0.4), 0)
+    end
+    
+    VirtualCamCFrame = CFrame.new(currentPos) * rotation
+    Camera.CFrame = VirtualCamCFrame
+end)
 
 -- Fly Engine
 RunService.RenderStepped:Connect(function()
-    if not Flying then return end
+    if not Flying or Invisible then return end
     local Character = GetCharacter()
     local Root = Character:FindFirstChild("HumanoidRootPart")
     if not Root then return end
@@ -335,7 +382,7 @@ task.spawn(function()
     while task.wait(1) do
         pcall(function()
             local char = Player.Character
-            if char then
+            if char and not Invisible then
                 local hum = char:FindFirstChildOfClass("Humanoid")
                 if hum then
                     hum.WalkSpeed = SpeedHack and HackSpeed or NormalSpeed
