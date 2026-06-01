@@ -1,3 +1,5 @@
+task.wait(1)
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
@@ -19,17 +21,14 @@ local FlySpeed = 50
 local NormalSpeed = 16
 local HackSpeed = 100
 local IsMinimized = false
-
--- Track original transparencies for restoring visibility
-local originalTransparencies = {}
+local MenuOpen = true
 
 -- --- MODERN UI CREATION ---
 local Gui = Instance.new("ScreenGui")
 Gui.Name = "SlimHub"
 Gui.ResetOnSpawn = false
-Gui.Parent = Player.PlayerGui
+Gui.Parent = Player:WaitForChild("PlayerGui")
 
--- Main Panel
 local Frame = Instance.new("Frame")
 Frame.Size = UDim2.fromOffset(420, 360)
 Frame.Position = UDim2.new(0.5, -210, 0.5, -180)
@@ -43,7 +42,6 @@ local Stroke = Instance.new("UIStroke", Frame)
 Stroke.Color = Color3.fromRGB(40, 40, 45)
 Stroke.Thickness = 1.5
 
--- Top Bar / Drag Handle
 local TopBar = Instance.new("Frame")
 TopBar.Size = UDim2.new(1, 0, 0, 45)
 TopBar.BackgroundColor3 = Color3.fromRGB(22, 22, 26)
@@ -64,14 +62,13 @@ local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, -60, 1, 0)
 Title.Position = UDim2.fromOffset(15, 0)
 Title.BackgroundTransparency = 1
-Title.Text = "SLIMHUB // CLIENT"
+Title.Text = "SLIMHUB // CLIENT [RSHIFT]"
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 16
 Title.TextColor3 = Color3.fromRGB(0, 255, 130)
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Parent = TopBar
 
--- Minimize Button
 local MinBtn = Instance.new("TextButton")
 MinBtn.Size = UDim2.fromOffset(30, 30)
 MinBtn.Position = UDim2.new(1, -40, 0.5, -15)
@@ -82,7 +79,6 @@ MinBtn.TextSize = 20
 MinBtn.TextColor3 = Color3.fromRGB(150, 150, 155)
 MinBtn.Parent = TopBar
 
--- UI Layout Container
 local Container = Instance.new("Frame")
 Container.Size = UDim2.new(1, -30, 1, -65)
 Container.Position = UDim2.fromOffset(15, 55)
@@ -226,16 +222,13 @@ end
 
 -- --- BUILDING THE INTERFACE ---
 
--- Fly Row
 local FlyControls = CreateRow("Fly Hack", 1)
 AddSlider(FlyControls, 16, 250, FlySpeed, function(val) FlySpeed = val end)
 AddToggle(FlyControls, function(state) Flying = state end)
 
--- Noclip Row
 local NoclipControls = CreateRow("Noclip", 2)
 AddToggle(NoclipControls, function(state) Noclip = state end)
 
--- Speed Row
 local SpeedControls = CreateRow("Speed Hack", 3)
 AddSlider(SpeedControls, 16, 150, HackSpeed, function(val)
     HackSpeed = val
@@ -254,30 +247,29 @@ AddToggle(SpeedControls, function(state)
     end
 end)
 
--- Invisibility Row
+-- Server-Replicating Client Invisibility
 local InvisControls = CreateRow("Invisibility", 4)
 AddToggle(InvisControls, function(state)
     Invisible = state
     local character = GetCharacter()
+    local root = character:FindFirstChild("HumanoidRootPart")
     
-    if Invisible then
-        -- Set to 0.99 transparency so physics remain active and un-frozen
-        for _, v in ipairs(character:GetDescendants()) do
-            if v:IsA("BasePart") or v:IsA("Decal") then
-                if v.Name ~= "HumanoidRootPart" then
-                    originalTransparencies[v] = v.Transparency
-                    v.Transparency = 0.99
-                end
+    if Invisible and root then
+        -- Exploit Trick: Break visual joints on the client. 
+        -- Because the client has network ownership of their character physics,
+        -- deleting these joints forces the server to replicate the destruction.
+        -- To other players, your avatar collapses or vanishes entirely, but your
+        -- HumanoidRootPart remains fully physics-active, letting you move and shoot.
+        local lowerTorso = character:FindFirstChild("LowerTorso") or character:FindFirstChild("Torso")
+        if lowerTorso then
+            local rootJoint = lowerTorso:FindFirstChild("RootJoint")
+            if rootJoint then
+                rootJoint:Destroy()
             end
         end
     else
-        -- Cleanly restore visible states upon toggling off
-        for part, originalValue in pairs(originalTransparencies) do
-            if part and part.Parent then
-                part.Transparency = originalValue
-            end
-        end
-        table.clear(originalTransparencies)
+        -- Un-toggling respawns the character to fix the broken joints safely
+        Player:LoadCharacter()
     end
 end)
 
@@ -290,6 +282,15 @@ MinBtn.MouseButton1Click:Connect(function()
     else
         CreateTween(Frame, {0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out}, {Size = UDim2.fromOffset(420, 360)})
         MinBtn.Text = "-"
+    end
+end)
+
+-- --- KEYBIND TO SHOW/HIDE CLIENT (RSHIFT) ---
+UIS.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.RightShift then
+        MenuOpen = not MenuOpen
+        Frame.Visible = MenuOpen
     end
 end)
 
