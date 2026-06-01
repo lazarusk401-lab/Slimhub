@@ -27,7 +27,6 @@ local MenuOpen = true
 -- Advanced Camera State Variables
 local SavedPosition = nil
 local CamX, CamY = 0, 0
-local TargetCamX, TargetCamY = 0, 0
 local VirtualCamPos = Vector3.zero
 local TargetCamPos = Vector3.zero
 
@@ -265,31 +264,29 @@ AddToggle(InvisControls, function(state)
     if not root then return end
     
     if Invisible then
-        -- 1. Freeze character behavior and snap them 100 studs straight down
+        -- 1. Cache location and move character down
         SavedPosition = root.CFrame
         root.CFrame = SavedPosition * CFrame.new(0, -100, 0)
         task.wait(0.05)
         root.Anchored = true
         
-        -- 2. Establish starting orientation baselines for smooth look equations
+        -- 2. Initialize orientation based on current camera look vector
         local startCFrame = Camera.CFrame
-        local _, yAngle, _ = startCFrame:ToEulerAnglesYXZ()
-        CamX = 0
+        local xAngle, yAngle, _ = startCFrame:ToEulerAnglesYXZ()
+        CamX = math.deg(xAngle)
         CamY = math.deg(yAngle)
-        TargetCamX = CamX
-        TargetCamY = CamY
         
         VirtualCamPos = startCFrame.Position
         TargetCamPos = VirtualCamPos
         
-        -- 3. Transition control state to Scriptable
+        -- 3. Shift camera to scriptable mode
         Camera.CameraType = Enum.CameraType.Scriptable
     else
-        -- 1. Revert to standard camera modes safely
+        -- 1. Restore defaults
         Camera.CameraType = Enum.CameraType.Custom
         UIS.MouseBehavior = Enum.MouseBehavior.Default
         
-        -- 2. Teleport character safely back up to where the drone camera left off
+        -- 2. Return character to the surface position tracked by the script
         root.Anchored = false
         if SavedPosition then
             local groundHeight = SavedPosition.Position.Y
@@ -322,50 +319,47 @@ end)
 
 -- --- MECHANICS LOOPS ---
 
--- Free-Look & Ultra-Smooth Cinematic Tracking Loop
+-- Capture Mouse Input Independently of MouseBehavior Restrictions
+UIS.InputChanged:Connect(function(input)
+    if not Invisible then return end
+    if input.UserInputType == Enum.UserInputType.MouseMovement then
+        local sensitivity = 0.15
+        CamY = CamY - (input.Delta.X * sensitivity)
+        CamX = math.clamp(CamX - (input.Delta.Y * sensitivity), -85, 85)
+    end
+end)
+
+-- Free-Look Rendering Loop
 RunService.RenderStepped:Connect(function(deltaTime)
     if not Invisible then return end
     
-    -- FORCE MOUSE TO CENTER EVERY FRAME TO PREVENT LOCK BREAKS
+    -- Maintain center lock to allow continuous delta accumulation
     UIS.MouseBehavior = Enum.MouseBehavior.LockCurrentPosition
     
-    -- Capture continuous mouse motion variables
-    local delta = UIS:GetMouseDelta()
-    local sensitivity = 0.15
-    
-    -- Accumulate target Euler coordinates based on directional mouse movement
-    TargetCamX = math.clamp(TargetCamX - (delta.Y * sensitivity), -85, 85)
-    TargetCamY = TargetCamY - (delta.X * sensitivity)
-    
-    -- Linearly interpolate (Lerp) rotations to give a smooth cinematic ease
-    CamX = CamX + (TargetCamX - CamX) * math.clamp(deltaTime * 18, 0, 1)
-    CamY = CamY + (TargetCamY - CamY) * math.clamp(deltaTime * 18, 0, 1)
-    
-    -- Build tracking rotation look matrix from angles
+    -- Generate rotation matrix from accumulated inputs
     local cameraRotation = CFrame.Angles(0, math.rad(CamY), 0) * CFrame.Angles(math.rad(CamX), 0, 0)
     
-    -- Handle positional physics translation calculations
+    -- Handle positional updates
     local moveVector = Vector3.zero
     if UIS:IsKeyDown(Enum.KeyCode.W) then moveVector += cameraRotation.LookVector end
     if UIS:IsKeyDown(Enum.KeyCode.S) then moveVector -= cameraRotation.LookVector end
     if UIS:IsKeyDown(Enum.KeyCode.A) then moveVector -= cameraRotation.RightVector end
     if UIS:IsKeyDown(Enum.KeyCode.D) then moveVector += cameraRotation.RightVector end
     
-    -- Scale travel velocities
     local currentMoveSpeed = SpeedHack and HackSpeed or NormalSpeed
     if moveVector.Magnitude > 0 then
         TargetCamPos = TargetCamPos + (moveVector.Unit * currentMoveSpeed * deltaTime)
     end
     
-    -- Enforce height locks to keep the camera operating smoothly on the ground floor plane
+    -- Keep height constrained relative to the original surface plane
     if SavedPosition then
         TargetCamPos = Vector3.new(TargetCamPos.X, SavedPosition.Position.Y + 5, TargetCamPos.Z)
     end
     
-    -- Smooth positional lerp
+    -- Smoothly interpolate positions
     VirtualCamPos = VirtualCamPos:Lerp(TargetCamPos, math.clamp(deltaTime * 12, 0, 1))
     
-    -- Inject smooth metrics into engine viewport
+    -- Apply to viewport CFrame
     Camera.CFrame = CFrame.new(VirtualCamPos) * cameraRotation
 end)
 
