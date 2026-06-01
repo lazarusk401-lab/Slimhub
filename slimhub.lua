@@ -1,10 +1,3 @@
-Here is the complete, integrated **SlimHub** local script with the updated invisibility logic that keeps your physics and movement fully active while keeping you hidden.
-
-### Complete SlimHub Script (`LocalScript`)
-
-Place this inside a **`LocalScript`** inside **`StarterGui`** or **`StarterPlayerScripts`**.
-
-```lua
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
@@ -390,5 +383,3 @@ UIS.InputChanged:Connect(function(input)
         UpdateDrag(input)
     end
 end)
-
-```
