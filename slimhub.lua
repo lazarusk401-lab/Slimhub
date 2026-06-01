@@ -154,7 +154,7 @@ local function CreateTabButton(name, customIconId)
     Btn.Size = UDim2.new(1, -10, 0, 40)
     Btn.Position = UDim2.fromOffset(5, 0)
     Btn.BackgroundTransparency = 1
-    Btn.Text = "" -- Text removed for custom structure layouts
+    Btn.Text = "" 
     Btn.Parent = Sidebar
     Btn.Name = name:upper()
     
@@ -167,19 +167,28 @@ local function CreateTabButton(name, customIconId)
     Label.Parent = Btn
 
     if customIconId then
-        -- Set up image format for Settings icon tab layouts
-        local Icon = Instance.new("ImageLabel")
-        Icon.Size = UDim2.fromOffset(16, 16)
-        Icon.Position = UDim2.fromOffset(12, 12)
-        Icon.BackgroundTransparency = 1
-        Icon.Image = customIconId
-        Icon.ImageColor3 = name == "Main" and Color3.fromRGB(0, 255, 150) or Color3.fromRGB(140, 140, 150)
-        Icon.Parent = Btn
-        Btn:SetAttribute("IconRef", Icon)
+        -- Safe construction wrapped in pcall to prevent image load failure crashes
+        local success, _ = pcall(function()
+            local Icon = Instance.new("ImageLabel")
+            Icon.Size = UDim2.fromOffset(16, 16)
+            Icon.Position = UDim2.fromOffset(12, 12)
+            Icon.BackgroundTransparency = 1
+            Icon.Image = customIconId
+            Icon.ImageColor3 = name == "Main" and Color3.fromRGB(0, 255, 150) or Color3.fromRGB(140, 140, 150)
+            Icon.Parent = Btn
+            Btn:SetAttribute("IconRef", Icon)
+            
+            Label.Size = UDim2.new(1, -40, 1, 0)
+            Label.Position = UDim2.fromOffset(36, 0)
+            Label.TextXAlignment = Enum.TextXAlignment.Left
+        end)
         
-        Label.Size = UDim2.new(1, -40, 1, 0)
-        Label.Position = UDim2.fromOffset(36, 0)
-        Label.TextXAlignment = Enum.TextXAlignment.Left
+        -- Fallback to text configuration if asset error occurs
+        if not success then
+            Label.Size = UDim2.new(1, -15, 1, 0)
+            Label.Position = UDim2.fromOffset(15, 0)
+            Label.TextXAlignment = Enum.TextXAlignment.Left
+        end
     else
         Label.Size = UDim2.new(1, -15, 1, 0)
         Label.Position = UDim2.fromOffset(15, 0)
@@ -194,17 +203,17 @@ local function CreateTabButton(name, customIconId)
         if ActiveTab == "Main" then
             MainTabFrame.Visible = true
             SettingsTabFrame.Visible = false
-            mainBtn.TextLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
-            settingsBtn.TextLabel.TextColor3 = Color3.fromRGB(140, 140, 150)
-            if settingsBtn:GetAttribute("IconRef") then
+            if mainBtn and mainBtn:FindFirstChild("TextLabel") then mainBtn.TextLabel.TextColor3 = Color3.fromRGB(0, 255, 150) end
+            if settingsBtn and settingsBtn:FindFirstChild("TextLabel") then settingsBtn.TextLabel.TextColor3 = Color3.fromRGB(140, 140, 150) end
+            if settingsBtn and settingsBtn:GetAttribute("IconRef") then
                 settingsBtn:GetAttribute("IconRef").ImageColor3 = Color3.fromRGB(140, 140, 150)
             end
         else
             MainTabFrame.Visible = false
             SettingsTabFrame.Visible = true
-            settingsBtn.TextLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
-            mainBtn.TextLabel.TextColor3 = Color3.fromRGB(140, 140, 150)
-            if settingsBtn:GetAttribute("IconRef") then
+            if settingsBtn and settingsBtn:FindFirstChild("TextLabel") then settingsBtn.TextLabel.TextColor3 = Color3.fromRGB(0, 255, 150) end
+            if mainBtn and mainBtn:FindFirstChild("TextLabel") then mainBtn.TextLabel.TextColor3 = Color3.fromRGB(140, 140, 150) end
+            if settingsBtn and settingsBtn:GetAttribute("IconRef") then
                 settingsBtn:GetAttribute("IconRef").ImageColor3 = Color3.fromRGB(0, 255, 150)
             end
         end
@@ -366,7 +375,7 @@ local function AddKeybindButton(controls, defaultKey, callback)
     end)
 end
 
--- --- BUILD TABS (No Emojis, Asset ID Linked to Image Target Focus) ---
+-- --- BUILD TABS ---
 CreateTabButton("Main", nil)
 CreateTabButton("Settings", "rbxassetid://128091171804797")
 
