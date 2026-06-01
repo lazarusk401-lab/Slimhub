@@ -44,8 +44,8 @@ local Config = {
 local ESPObjects = {}
 local ToggleCallbacks = {}
 local Dragging = false
-local DragStart = nil
-local FrameStart = nil
+local DragOffset = nil
+local TargetPosition = nil
 local DroneNode = nil
 local SavedPosition = nil
 
@@ -55,27 +55,29 @@ Gui.Name = "SlimHub"
 Gui.ResetOnSpawn = false
 Gui.Parent = CoreGui
 
-local Frame = Instance.new("Frame")
-Frame.Size = UDim2.fromOffset(500, 380)
-Frame.Position = UDim2.new(0.5, 0, 0.5, 0)
-Frame.AnchorPoint = Vector2.new(0.5, 0.5)
-Frame.BackgroundColor3 = Color3.fromRGB(13, 13, 17)
-Frame.BorderSizePixel = 0
-Frame.ClipsDescendants = true
-Frame.Parent = Gui
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.fromOffset(500, 380)
+MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+MainFrame.BackgroundColor3 = Color3.fromRGB(13, 13, 17)
+MainFrame.BorderSizePixel = 0
+MainFrame.ClipsDescendants = true
+MainFrame.Parent = Gui
 
-Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 12)
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 12)
 
-local Stroke = Instance.new("UIStroke", Frame)
+local Stroke = Instance.new("UIStroke", MainFrame)
 Stroke.Color = Color3.fromRGB(40, 40, 50)
 Stroke.Thickness = 1.5
 
 -- Top Bar
 local TopBar = Instance.new("Frame")
+TopBar.Name = "TopBar"
 TopBar.Size = UDim2.new(1, 0, 0, 50)
 TopBar.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
 TopBar.BorderSizePixel = 0
-TopBar.Parent = Frame
+TopBar.Parent = MainFrame
 
 local Cover = Instance.new("Frame")
 Cover.Size = UDim2.new(1, 0, 0, 15)
@@ -87,7 +89,7 @@ Cover.Parent = TopBar
 Instance.new("UICorner", TopBar).CornerRadius = UDim.new(0, 12)
 
 local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, -60, 1, 0)
+Title.Size = UDim2.new(1, -100, 1, 0)
 Title.Position = UDim2.fromOffset(20, 0)
 Title.BackgroundTransparency = 1
 Title.Text = "SLIMHUB // PREMIUM"
@@ -97,7 +99,9 @@ Title.TextColor3 = Color3.fromRGB(0, 255, 150)
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Parent = TopBar
 
+-- Minimize Button
 local MinBtn = Instance.new("TextButton")
+MinBtn.Name = "MinBtn"
 MinBtn.Size = UDim2.fromOffset(30, 30)
 MinBtn.Position = UDim2.new(1, -45, 0.5, -15)
 MinBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 36)
@@ -115,7 +119,7 @@ Sidebar.Size = UDim2.new(0, 130, 1, -50)
 Sidebar.Position = UDim2.fromOffset(0, 50)
 Sidebar.BackgroundColor3 = Color3.fromRGB(15, 15, 19)
 Sidebar.BorderSizePixel = 0
-Sidebar.Parent = Frame
+Sidebar.Parent = MainFrame
 
 local TabList = Instance.new("UIListLayout", Sidebar)
 TabList.Padding = UDim.new(0, 4)
@@ -125,7 +129,7 @@ local ContentArea = Instance.new("Frame")
 ContentArea.Size = UDim2.new(1, -145, 1, -65)
 ContentArea.Position = UDim2.fromOffset(140, 60)
 ContentArea.BackgroundTransparency = 1
-ContentArea.Parent = Frame
+ContentArea.Parent = MainFrame
 
 -- Tabs
 local Tabs = {}
@@ -352,7 +356,6 @@ local function CreateSlider(parent, text, configKey, min, max, callback)
     
     Instance.new("UICorner", Fill).CornerRadius = UDim.new(1, 0)
     
-    -- Invisible hit area for easier grabbing
     local HitArea = Instance.new("TextButton")
     HitArea.Name = "HitArea"
     HitArea.Size = UDim2.new(1, 0, 4, 0)
@@ -371,7 +374,6 @@ local function CreateSlider(parent, text, configKey, min, max, callback)
     
     Instance.new("UICorner", Knob).CornerRadius = UDim.new(1, 0)
     
-    -- Glow effect behind knob
     local Glow = Instance.new("Frame")
     Glow.Name = "Glow"
     Glow.Size = UDim2.fromOffset(0, 0)
@@ -397,7 +399,6 @@ local function CreateSlider(parent, text, configKey, min, max, callback)
         if callback then callback(val) end
     end
     
-    -- Hover animations
     Knob.MouseEnter:Connect(function()
         TweenService:Create(Knob, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {Size = UDim2.fromOffset(18, 18)}):Play()
         Glow.Visible = true
@@ -442,7 +443,6 @@ local function CreateSlider(parent, text, configKey, min, max, callback)
     end)
 end
 
--- Keybind Button Creator
 local function CreateKeybindButton(parent, text, configKey, callback)
     local Row = Instance.new("Frame")
     Row.Size = UDim2.new(1, 0, 0, 40)
@@ -519,7 +519,6 @@ CreateSlider(MainSection, "Walk Speed", "HackSpeed", 16, 150, function(val)
 end)
 CreateToggle(MainSection, "Noclip", "Noclip")
 
--- INVISIBILITY TOGGLE
 CreateToggle(MainSection, "Invisibility", "Invisible", function(state)
     local character = Player.Character or Player.CharacterAdded:Wait()
     local root = character:WaitForChild("HumanoidRootPart")
@@ -616,7 +615,7 @@ HitboxBtn.MouseButton1Click:Connect(function()
     HitboxBtn.Text = Config.SilentAimHitbox:upper()
 end)
 
--- Build Settings Tab with Keybinds
+-- Build Settings Tab
 local SettingsSection = CreateSection(Tabs.Settings, "Keybinds")
 CreateKeybindButton(SettingsSection, "Menu Toggle", "MenuKeybind")
 CreateKeybindButton(SettingsSection, "Fly Toggle", "FlyKeybind")
@@ -749,6 +748,19 @@ end
 
 -- Loops
 RunService.RenderStepped:Connect(function()
+    -- Smooth dragging
+    if Dragging and TargetPosition then
+        local current = MainFrame.Position
+        local target = TargetPosition
+        local smooth = UDim2.new(
+            current.X.Scale,
+            current.X.Offset + (target.X.Offset - current.X.Offset) * 0.3,
+            current.Y.Scale,
+            current.Y.Offset + (target.Y.Offset - current.Y.Offset) * 0.3
+        )
+        MainFrame.Position = smooth
+    end
+    
     -- Fly
     if Config.Flying then
         local char = Player.Character
@@ -811,13 +823,11 @@ RunService.RenderStepped:Connect(function()
     local rainbowColor = Color3.fromHSV((tick() * 0.5) % 1, 1, 1)
     local espColor = Config.ESPRainbow and rainbowColor or Color3.fromRGB(0, 255, 150)
     
-    -- FOV Circle
     FOVCircle.Visible = Config.SilentAim
     FOVCircle.Position = UIS:GetMouseLocation()
     FOVCircle.Radius = Config.SilentAimFOV
     FOVCircle.Color = espColor
     
-    -- ESP
     for p, drawings in pairs(ESPObjects) do
         if Config.ESPEnabled and p.Character then
             local char = p.Character
@@ -878,17 +888,15 @@ end)
 UIS.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     
-    -- Menu toggle
     if input.KeyCode == Config.MenuKeybind then
         if Config.IsMinimized then
             MinCircle.MouseButton1Click:Fire()
         else
             Config.MenuOpen = not Config.MenuOpen
-            Frame.Visible = Config.MenuOpen
+            MainFrame.Visible = Config.MenuOpen
         end
     end
     
-    -- Feature keybinds
     if Config.FlyKeybind and input.KeyCode == Config.FlyKeybind then
         if ToggleCallbacks["Flying"] then
             ToggleCallbacks["Flying"](not Config.Flying)
@@ -933,35 +941,35 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
--- DRAGGING
+-- SMOOTH DRAGGING
 TopBar.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
         Dragging = true
-        DragStart = input.Position
-        FrameStart = Frame.Position
+        local mousePos = UIS:GetMouseLocation()
+        local framePos = MainFrame.AbsolutePosition
+        DragOffset = mousePos - framePos
     end
 end)
 
-TopBar.InputChanged:Connect(function(input)
+UIS.InputChanged:Connect(function(input)
     if Dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-        local delta = input.Position - DragStart
-        Frame.Position = UDim2.new(
-            FrameStart.X.Scale,
-            FrameStart.X.Offset + delta.X,
-            FrameStart.Y.Scale,
-            FrameStart.Y.Offset + delta.Y
-        )
+        local mousePos = UIS:GetMouseLocation()
+        local newPos = mousePos - DragOffset
+        TargetPosition = UDim2.fromOffset(newPos.X, newPos.Y)
     end
 end)
 
-TopBar.InputEnded:Connect(function(input)
+UIS.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
         Dragging = false
+        DragOffset = nil
+        TargetPosition = nil
     end
 end)
 
--- MINIMIZE
+-- MINIMIZE CIRCLE
 local MinCircle = Instance.new("TextButton")
+MinCircle.Name = "MinCircle"
 MinCircle.Size = UDim2.fromOffset(0, 0)
 MinCircle.Position = UDim2.new(1, -70, 1, -70)
 MinCircle.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -979,28 +987,40 @@ local CircleStroke = Instance.new("UIStroke", MinCircle)
 CircleStroke.Color = Color3.fromRGB(0, 255, 150)
 CircleStroke.Thickness = 2
 
+-- MINIMIZE FUNCTION
 MinBtn.MouseButton1Click:Connect(function()
+    if Config.IsMinimized then return end
     Config.IsMinimized = true
     
-    local circlePos = MinCircle.AbsolutePosition + Vector2.new(27, 27)
+    -- Get circle position in absolute coordinates
+    local circleAbsPos = Vector2.new(
+        Camera.ViewportSize.X - 70,
+        Camera.ViewportSize.Y - 70
+    )
     
-    TweenService:Create(Frame, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
+    -- Animate to circle position and shrink
+    TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
         Size = UDim2.fromOffset(0, 0),
-        Position = UDim2.fromOffset(circlePos.X, circlePos.Y)
+        Position = UDim2.fromOffset(circleAbsPos.X, circleAbsPos.Y)
     }):Play()
     
-    task.wait(0.35)
-    Frame.Visible = false
+    task.wait(0.4)
+    MainFrame.Visible = false
     
+    -- Show circle with bounce
     MinCircle.Visible = true
+    MinCircle.Size = UDim2.fromOffset(0, 0)
     TweenService:Create(MinCircle, TweenInfo.new(0.5, Enum.EasingStyle.Elastic, Enum.EasingDirection.Out), {
         Size = UDim2.fromOffset(55, 55)
     }):Play()
 end)
 
+-- RESTORE FUNCTION
 MinCircle.MouseButton1Click:Connect(function()
+    if not Config.IsMinimized then return end
     Config.IsMinimized = false
     
+    -- Shrink circle
     TweenService:Create(MinCircle, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
         Size = UDim2.fromOffset(0, 0)
     }):Play()
@@ -1008,13 +1028,15 @@ MinCircle.MouseButton1Click:Connect(function()
     task.wait(0.25)
     MinCircle.Visible = false
     
-    Frame.Visible = true
-    TweenService:Create(Frame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+    -- Restore main frame with bounce
+    MainFrame.Visible = true
+    TweenService:Create(MainFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
         Size = UDim2.fromOffset(500, 380),
         Position = UDim2.new(0.5, 0, 0.5, 0)
     }):Play()
 end)
 
+-- Circle hover
 MinCircle.MouseEnter:Connect(function()
     TweenService:Create(MinCircle, TweenInfo.new(0.2), {Size = UDim2.fromOffset(65, 65)}):Play()
     TweenService:Create(CircleStroke, TweenInfo.new(0.2), {Thickness = 3}):Play()
@@ -1025,9 +1047,9 @@ MinCircle.MouseLeave:Connect(function()
     TweenService:Create(CircleStroke, TweenInfo.new(0.2), {Thickness = 2}):Play()
 end)
 
--- Entrance
-Frame.Size = UDim2.fromOffset(0, 0)
-TweenService:Create(Frame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+-- Entrance animation
+MainFrame.Size = UDim2.fromOffset(0, 0)
+TweenService:Create(MainFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
     Size = UDim2.fromOffset(500, 380)
 }):Play()
 
