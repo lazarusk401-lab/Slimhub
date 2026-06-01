@@ -17,17 +17,18 @@ local SpeedHack = false
 local FlySpeed = 50
 local NormalSpeed = 16
 local HackSpeed = 100
+local IsMinimized = false
 
--- --- MOD MODERN UI CREATION ---
+-- --- MODERN UI CREATION ---
 local Gui = Instance.new("ScreenGui")
-Gui.Name = "SlimJimPremium"
+Gui.Name = "SlimHub"
 Gui.ResetOnSpawn = false
 Gui.Parent = Player.PlayerGui
 
 -- Main Panel
 local Frame = Instance.new("Frame")
-Frame.Size = UDim2.fromOffset(400, 320)
-Frame.Position = UDim2.new(0.5, -200, 0.5, -160)
+Frame.Size = UDim2.fromOffset(420, 320)
+Frame.Position = UDim2.new(0.5, -210, 0.5, -160)
 Frame.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
 Frame.BorderSizePixel = 0
 Frame.ClipsDescendants = true
@@ -48,7 +49,6 @@ TopBar.Parent = Frame
 local TopCorner = Instance.new("UICorner", TopBar)
 TopCorner.CornerRadius = UDim.new(0, 10)
 
--- Cover the bottom corners of the top bar to keep them sharp
 local Cover = Instance.new("Frame")
 Cover.Size = UDim2.new(1, 0, 0, 10)
 Cover.Position = UDim2.new(0, 0, 1, -10)
@@ -57,15 +57,26 @@ Cover.BorderSizePixel = 0
 Cover.Parent = TopBar
 
 local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, -20, 1, 0)
+Title.Size = UDim2.new(1, -60, 1, 0)
 Title.Position = UDim2.fromOffset(15, 0)
 Title.BackgroundTransparency = 1
-Title.Text = "SLIM JIM // CHEAT MENU"
+Title.Text = "SLIMHUB // CLIENT"
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 16
 Title.TextColor3 = Color3.fromRGB(0, 255, 130)
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Parent = TopBar
+
+-- Minimize Button
+local MinBtn = Instance.new("TextButton")
+MinBtn.Size = UDim2.fromOffset(30, 30)
+MinBtn.Position = UDim2.new(1, -40, 0.5, -15)
+MinBtn.BackgroundTransparency = 1
+MinBtn.Text = "-"
+MinBtn.Font = Enum.Font.GothamBold
+MinBtn.TextSize = 20
+MinBtn.TextColor3 = Color3.fromRGB(150, 150, 155)
+MinBtn.Parent = TopBar
 
 -- UI Layout Container
 local Container = Instance.new("Frame")
@@ -79,44 +90,51 @@ Layout.SortOrder = Enum.SortOrder.LayoutOrder
 Layout.Padding = UDim.new(0, 12)
 
 -- --- UTILITY UI FUNCTIONS ---
-
 local function CreateTween(obj, info, propertyTable)
     local tween = TweenService:Create(obj, TweenInfo.new(unpack(info)), propertyTable)
     tween:Play()
     return tween
 end
 
--- Smooth Component Builders
+-- Fixed Layout Rows (Two Distinct Columns to Stop Overlapping)
 local function CreateRow(name, layoutOrder)
     local Row = Instance.new("Frame")
-    Row.Size = UDim2.new(1, 0, 0, 45)
+    Row.Size = UDim2.new(1, 0, 0, 50)
     Row.BackgroundColor3 = Color3.fromRGB(22, 22, 26)
     Row.BorderSizePixel = 0
     Row.LayoutOrder = layoutOrder
     Row.Parent = Container
     Instance.new("UICorner", Row).CornerRadius = UDim.new(0, 6)
     
+    -- Left Side: Text Label
     local Label = Instance.new("TextLabel")
-    Label.Size = UDim2.new(0.4, 0, 1, 0)
+    Label.Size = UDim2.new(0.35, 0, 1, 0)
     Label.Position = UDim2.fromOffset(12, 0)
     Label.BackgroundTransparency = 1
     Label.Text = name:upper()
     Label.Font = Enum.Font.GothamMedium
     Label.TextColor3 = Color3.fromRGB(200, 200, 200)
-    Label.TextSize = 14
+    Label.TextSize = 13
     Label.TextXAlignment = Enum.TextXAlignment.Left
     Label.Parent = Row
     
-    return Row
+    -- Right Side: Controls Wrapper
+    local Controls = Instance.new("Frame")
+    Controls.Size = UDim2.new(0.65, -12, 1, 0)
+    Controls.Position = UDim2.new(0.35, 0, 0, 0)
+    Controls.BackgroundTransparency = 1
+    Controls.Parent = Row
+    
+    return Controls
 end
 
-local function AddToggle(row, callback)
+local function AddToggle(controls, callback)
     local ToggleBtn = Instance.new("TextButton")
     ToggleBtn.Size = UDim2.fromOffset(45, 22)
-    ToggleBtn.Position = UDim2.new(1, -57, 0.5, -11)
+    ToggleBtn.Position = UDim2.new(1, -45, 0.5, -11)
     ToggleBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
     ToggleBtn.Text = ""
-    ToggleBtn.Parent = row
+    ToggleBtn.Parent = controls
     Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(1, 0)
     
     local Switch = Instance.new("Frame")
@@ -141,13 +159,13 @@ local function AddToggle(row, callback)
     end)
 end
 
-local function AddSlider(row, min, max, default, callback)
+local function AddSlider(controls, min, max, default, callback)
     local SliderFrame = Instance.new("Frame")
-    SliderFrame.Size = UDim2.new(0.4, 0, 0, 6)
-    SliderFrame.Position = UDim2.new(0.6, -210, 0.5, -3)
+    SliderFrame.Size = UDim2.new(1, -110, 0, 6)
+    SliderFrame.Position = UDim2.new(0, 0, 0.5, -3)
     SliderFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
     SliderFrame.BorderSizePixel = 0
-    SliderFrame.Parent = row
+    SliderFrame.Parent = controls
     Instance.new("UICorner", SliderFrame).CornerRadius = UDim.new(1, 0)
     
     local Fill = Instance.new("Frame")
@@ -165,15 +183,15 @@ local function AddSlider(row, min, max, default, callback)
     Trigger.Parent = SliderFrame
     
     local ValueLabel = Instance.new("TextLabel")
-    ValueLabel.Size = UDim2.fromOffset(40, 20)
-    ValueLabel.Position = UDim2.new(0.6, -260, 0.5, -10)
+    ValueLabel.Size = UDim2.fromOffset(45, 20)
+    ValueLabel.Position = UDim2.new(1, -100, 0.5, -10)
     ValueLabel.BackgroundTransparency = 1
     ValueLabel.Text = tostring(default)
     ValueLabel.Font = Enum.Font.Code
     ValueLabel.TextColor3 = Color3.fromRGB(140, 140, 145)
     ValueLabel.TextSize = 13
-    ValueLabel.TextXAlignment = Enum.TextXAlignment.Right
-    ValueLabel.Parent = row
+    ValueLabel.TextXAlignment = Enum.TextXAlignment.Center
+    ValueLabel.Parent = controls
 
     local holding = false
     
@@ -208,23 +226,25 @@ end
 -- --- BUILDING THE INTERFACE ---
 
 -- Fly Row
-local FlyRow = CreateRow("Fly Hack", 1)
-AddToggle(FlyRow, function(state)
-    Flying = state
-end)
-AddSlider(FlyRow, 16, 250, FlySpeed, function(val)
-    FlySpeed = val
-end)
+local FlyControls = CreateRow("Fly Hack", 1)
+AddSlider(FlyControls, 16, 250, FlySpeed, function(val) FlySpeed = val end)
+AddToggle(FlyControls, function(state) Flying = state end)
 
 -- Noclip Row
-local NoclipRow = CreateRow("Noclip", 2)
-AddToggle(NoclipRow, function(state)
-    Noclip = state
-end)
+local NoclipControls = CreateRow("Noclip", 2)
+AddToggle(NoclipControls, function(state) Noclip = state end)
 
 -- Speed Row
-local SpeedRow = CreateRow("Speed Hack", 3)
-AddToggle(SpeedRow, function(state)
+local SpeedControls = CreateRow("Speed Hack", 3)
+AddSlider(SpeedControls, 16, 150, HackSpeed, function(val)
+    HackSpeed = val
+    if SpeedHack then
+        local char = GetCharacter()
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if hum then hum.WalkSpeed = HackSpeed end
+    end
+end)
+AddToggle(SpeedControls, function(state)
     SpeedHack = state
     local char = GetCharacter()
     local hum = char:FindFirstChildOfClass("Humanoid")
@@ -232,12 +252,16 @@ AddToggle(SpeedRow, function(state)
         hum.WalkSpeed = state and HackSpeed or NormalSpeed
     end
 end)
-AddSlider(SpeedRow, 16, 150, HackSpeed, function(val)
-    HackSpeed = val
-    if SpeedHack then
-        local char = GetCharacter()
-        local hum = char:FindFirstChildOfClass("Humanoid")
-        if hum then hum.WalkSpeed = HackSpeed end
+
+-- --- MINIMIZE SYSTEM ---
+MinBtn.MouseButton1Click:Connect(function()
+    IsMinimized = not IsMinimized
+    if IsMinimized then
+        CreateTween(Frame, {0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out}, {Size = UDim2.fromOffset(420, 45)})
+        MinBtn.Text = "+"
+    else
+        CreateTween(Frame, {0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out}, {Size = UDim2.fromOffset(420, 320)})
+        MinBtn.Text = "-"
     end
 end)
 
@@ -278,39 +302,56 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- Continuous Speed Control (Prevents game resets resetting walkspeed)
-GetCharacter():FindFirstChildOfClass("Humanoid").WalkSpeed = SpeedHack and HackSpeed or NormalSpeed
-Player.CharacterAdded:Connect(function(char)
-    local hum = char:WaitForChild("Humanoid")
-    hum.WalkSpeed = SpeedHack and HackSpeed or NormalSpeed
-end)
-
--- --- SMOOTH DRAGGING SYSTEM ---
-local Dragging, DragStart, StartPos
-TopBar.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        Dragging = true
-        DragStart = input.Position
-        StartPos = Frame.Position
+-- Loop to catch character respawns for speed
+task.spawn(function()
+    while task.wait(1) do
+        pcall(function()
+            local char = Player.Character
+            if char then
+                local hum = char:FindFirstChildOfClass("Humanoid")
+                if hum then
+                    hum.WalkSpeed = SpeedHack and HackSpeed or NormalSpeed
+                end
+            end
+        end)
     end
 end)
 
-UIS.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        Dragging = false
+-- --- FIXED DRAGGING SYSTEM ---
+local Dragging, DragInput, DragStart, StartPos
+
+local function UpdateDrag(input)
+    local delta = input.Position - DragStart
+    Frame.Position = UDim2.new(
+        StartPos.X.Scale,
+        StartPos.X.Offset + delta.X,
+        StartPos.Y.Scale,
+        StartPos.Y.Offset + delta.Y
+    )
+end
+
+TopBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        Dragging = true
+        DragStart = input.Position
+        StartPos = Frame.Position
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                Dragging = false
+            end
+        end)
+    end
+end)
+
+TopBar.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        DragInput = input
     end
 end)
 
 UIS.InputChanged:Connect(function(input)
-    if Dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-        local Delta = input.Position - DragStart
-        TweenService:Create(Frame, TweenInfo.new(0.08, Enum.EasingStyle.OutQuad), {
-            Position = UDim2.new(
-                StartPos.X.Scale,
-                StartPos.X.Offset + Delta.X,
-                StartPos.Y.Scale,
-                StartPos.Y.Offset + Delta.Y
-            )
-        }):Play()
+    if input == DragInput and Dragging then
+        UpdateDrag(input)
     end
 end)
