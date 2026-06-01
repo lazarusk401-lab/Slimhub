@@ -24,9 +24,13 @@ local HackSpeed = 100
 local IsMinimized = false
 local MenuOpen = true
 
--- Invisibility State Variables
+-- Advanced Camera State Variables
 local SavedPosition = nil
-local VirtualCamCFrame = CFrame.new()
+local CamRenderLoop = nil
+local CamX, CamY = 0, 0
+local TargetCamX, TargetCamY = 0, 0
+local VirtualCamPos = Vector3.zero
+local TargetCamPos = Vector3.zero
 
 -- --- MODERN UI CREATION ---
 local Gui = Instance.new("ScreenGui")
@@ -262,29 +266,37 @@ AddToggle(InvisControls, function(state)
     if not root then return end
     
     if Invisible then
-        -- 1. Cache the exact surface location and initial camera orientation
+        -- 1. Freeze character behavior and snap them 100 studs straight down
         SavedPosition = root.CFrame
-        VirtualCamCFrame = Camera.CFrame
-        
-        -- 2. Drop the physical character 100 studs below the map and anchor it
         root.CFrame = SavedPosition * CFrame.new(0, -100, 0)
-        task.wait(0.1)
+        task.wait(0.05)
         root.Anchored = true
         
-        -- 3. Detach the camera from the player model
-        Camera.CameraType = Enum.CameraType.Scriptable
-    else
-        -- 1. Re-attach the camera back to normal tracking mode
-        Camera.CameraType = Enum.CameraType.Custom
+        -- 2. Establish starting orientation baselines for smooth look equations
+        local startCFrame = Camera.CFrame
+        local _, yAngle, _ = startCFrame:ToEulerAnglesYXZ()
+        CamX = 0
+        CamY = math.deg(yAngle)
+        TargetCamX = CamX
+        TargetCamY = CamY
         
-        -- 2. Unanchor and teleport the character back to where the camera is looking on the surface
+        VirtualCamPos = startCFrame.Position
+        TargetCamPos = VirtualCamPos
+        
+        -- 3. Transition control state to Scriptable
+        Camera.CameraType = Enum.CameraType.Scriptable
+        UIS.MouseBehavior = Enum.MouseBehavior.LockCurrentPosition
+    else
+        -- 1. Revert to standard camera modes safely
+        Camera.CameraType = Enum.CameraType.Custom
+        UIS.MouseBehavior = Enum.MouseBehavior.Default
+        
+        -- 2. Teleport character safely back up to where the drone camera left off
         root.Anchored = false
         if SavedPosition then
-            -- Projects the player onto the floor location tracking beneath the virtual camera
             local groundHeight = SavedPosition.Position.Y
-            root.CFrame = CFrame.new(VirtualCamCFrame.Position.X, groundHeight, VirtualCamCFrame.Position.Z)
+            root.CFrame = CFrame.new(VirtualCamPos.X, groundHeight, VirtualCamPos.Z)
         end
-        
         SavedPosition = nil
     end
 end)
@@ -312,34 +324,48 @@ end)
 
 -- --- MECHANICS LOOPS ---
 
--- Camera Control & Navigation Loop for Invisibility Mode
-RunService.RenderStepped:Connect(function()
+-- Free-Look & Ultra-Smooth Cinematic Tracking Loop
+RunService.RenderStepped:Connect(function(deltaTime)
     if not Invisible then return end
     
-    -- Capture mouse delta rotation smoothly while right click is held
+    -- Capture continuous mouse motion variables
     local delta = UIS:GetMouseDelta()
-    local camSpeed = (SpeedHack and HackSpeed or NormalSpeed) * 0.03
+    local sensitivity = 0.15
     
-    local moveDirection = Vector3.zero
-    if UIS:IsKeyDown(Enum.KeyCode.W) then moveDirection += VirtualCamCFrame.LookVector end
-    if UIS:IsKeyDown(Enum.KeyCode.S) then moveDirection -= VirtualCamCFrame.LookVector end
-    if UIS:IsKeyDown(Enum.KeyCode.A) then moveDirection -= VirtualCamCFrame.RightVector end
-    if UIS:IsKeyDown(Enum.KeyCode.D) then moveDirection += VirtualCamCFrame.RightVector end
+    -- Accumulate target Euler coordinates based on directional mouse movement
+    TargetCamX = math.clamp(TargetCamX - (delta.Y * sensitivity), -85, 85)
+    TargetCamY = TargetCamY - (delta.X * sensitivity)
     
-    -- Keep the camera height relative to the original surface floor layout
-    local currentPos = VirtualCamCFrame.Position + (moveDirection * camSpeed)
+    -- Linearly interpolate (Lerp) rotations to give a smooth cinematic ease
+    CamX = CamX + (TargetCamX - CamX) * math.clamp(deltaTime * 18, 0, 1)
+    CamY = CamY + (TargetCamY - CamY) * math.clamp(deltaTime * 18, 0, 1)
+    
+    -- Build tracking rotation look matrix from angles
+    local cameraRotation = CFrame.Angles(0, math.rad(CamY), 0) * CFrame.Angles(math.rad(CamX), 0, 0)
+    
+    -- Handle positional physics translation calculations
+    local moveVector = Vector3.zero
+    if UIS:IsKeyDown(Enum.KeyCode.W) then moveVector += cameraRotation.LookVector end
+    if UIS:IsKeyDown(Enum.KeyCode.S) then moveVector -= cameraRotation.LookVector end
+    if UIS:IsKeyDown(Enum.KeyCode.A) then moveVector -= cameraRotation.RightVector end
+    if UIS:IsKeyDown(Enum.KeyCode.D) then moveVector += cameraRotation.RightVector end
+    
+    -- Scale travel velocities
+    local currentMoveSpeed = SpeedHack and HackSpeed or NormalSpeed
+    if moveVector.Magnitude > 0 then
+        TargetCamPos = TargetCamPos + (moveVector.Unit * currentMoveSpeed * deltaTime)
+    end
+    
+    -- Enforce height locks to keep the camera operating smoothly on the ground floor plane
     if SavedPosition then
-        currentPos = Vector3.new(currentPos.X, SavedPosition.Position.Y + 5, currentPos.Z)
+        TargetCamPos = Vector3.new(TargetCamPos.X, SavedPosition.Position.Y + 5, TargetCamPos.Z)
     end
     
-    -- Update virtual rotation look matrix if user is steering the mouse
-    local rotation = VirtualCamCFrame - VirtualCamCFrame.Position
-    if UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
-        rotation = rotation * CFrame.Angles(0, math.rad(-delta.X * 0.4), 0)
-    end
+    -- Smooth positional lerp
+    VirtualCamPos = VirtualCamPos:Lerp(TargetCamPos, math.clamp(deltaTime * 12, 0, 1))
     
-    VirtualCamCFrame = CFrame.new(currentPos) * rotation
-    Camera.CFrame = VirtualCamCFrame
+    -- Inject smooth metrics into engine viewport
+    Camera.CFrame = CFrame.new(VirtualCamPos) * cameraRotation
 end)
 
 -- Fly Engine
