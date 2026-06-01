@@ -21,9 +21,14 @@ local Invisible = false
 local FlySpeed = 50
 local NormalSpeed = 16
 local HackSpeed = 100
-local DroneSpeed = 45 -- Significantly boosted for fast tracking
+local DroneSpeed = 45
 
+-- Master Keybind Configurations (Cheats default to nil/optional)
 local MenuKeybind = Enum.KeyCode.RightShift
+local FlyKeybind = nil
+local NoclipKeybind = nil
+local SpeedKeybind = nil
+
 local IsMinimized = false
 local MenuOpen = true
 local ActiveTab = "Main"
@@ -41,7 +46,8 @@ Gui.Parent = Player:WaitForChild("PlayerGui")
 -- Main Menu Frame
 local Frame = Instance.new("Frame")
 Frame.Size = UDim2.fromOffset(500, 380)
-Frame.Position = UDim2.new(0.5, -250, 0.5, -190)
+Frame.Position = UDim2.new(0.5, 0, 0.5, 0)
+Frame.AnchorPoint = Vector2.new(0.5, 0.5) -- Perfect center pivoting
 Frame.BackgroundColor3 = Color3.fromRGB(11, 11, 14)
 Frame.BorderSizePixel = 0
 Frame.ClipsDescendants = true
@@ -125,13 +131,16 @@ MainLayout.Padding = UDim.new(0, 10)
 local SettingsTabFrame = Instance.new("ScrollingFrame")
 SettingsTabFrame.Size = UDim2.fromScale(1, 1)
 SettingsTabFrame.BackgroundTransparency = 1
-SettingsTabFrame.CanvasSize = UDim2.fromScale(0, 1)
-SettingsTabFrame.ScrollBarThickness = 0
+SettingsTabFrame.CanvasSize = UDim2.fromScale(0, 1.4)
+SettingsTabFrame.ScrollBarThickness = 2
 SettingsTabFrame.Visible = false
 SettingsTabFrame.Parent = ContentArea
 
 local SettingsLayout = Instance.new("UIListLayout", SettingsTabFrame)
 SettingsLayout.Padding = UDim.new(0, 10)
+
+-- Shared Global UI Object References for Keybind Actions
+local ToggleButtonsMap = {}
 
 -- --- UTILITY ANIMATION & UI FUNCTIONS ---
 local function CreateTween(obj, info, propertyTable)
@@ -178,7 +187,7 @@ local function CreateRow(name, parentContainer)
     Instance.new("UICorner", Row).CornerRadius = UDim.new(0, 6)
     
     local Label = Instance.new("TextLabel")
-    Label.Size = UDim2.new(0.4, 0, 1, 0)
+    Label.Size = UDim2.new(0.45, 0, 1, 0)
     Label.Position = UDim2.fromOffset(15, 0)
     Label.BackgroundTransparency = 1
     Label.Text = name:upper()
@@ -197,7 +206,7 @@ local function CreateRow(name, parentContainer)
     return Controls
 end
 
-local function AddToggle(controls, callback)
+local function AddToggle(controls, cheatKey, callback)
     local ToggleBtn = Instance.new("TextButton")
     ToggleBtn.Size = UDim2.fromOffset(42, 22)
     ToggleBtn.Position = UDim2.new(1, -45, 0.5, -11)
@@ -215,7 +224,7 @@ local function AddToggle(controls, callback)
     Instance.new("UICorner", Switch).CornerRadius = UDim.new(1, 0)
     
     local state = false
-    ToggleBtn.MouseButton1Click:Connect(function()
+    local function fireToggle()
         state = not state
         if state then
             CreateTween(ToggleBtn, {0.2}, {BackgroundColor3 = Color3.fromRGB(0, 255, 150)})
@@ -225,7 +234,10 @@ local function AddToggle(controls, callback)
             CreateTween(Switch, {0.2, Enum.EasingStyle.Quad}, {Position = UDim2.fromOffset(3, 3)})
         end
         callback(state)
-    end)
+    end
+    
+    ToggleBtn.MouseButton1Click:Connect(fireToggle)
+    ToggleButtonsMap[cheatKey] = fireToggle
 end
 
 local function AddSlider(controls, min, max, default, callback)
@@ -286,10 +298,10 @@ local function AddKeybindButton(controls, defaultKey, callback)
     BindBtn.Size = UDim2.fromOffset(120, 28)
     BindBtn.Position = UDim2.new(1, -120, 0.5, -14)
     BindBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 36)
-    BindBtn.Text = defaultKey.Name:upper()
+    BindBtn.Text = defaultKey and defaultKey.Name:upper() or "[ NONE ]"
     BindBtn.Font = Enum.Font.Code
     BindBtn.TextSize = 12
-    BindBtn.TextColor3 = Color3.fromRGB(0, 255, 150)
+    BindBtn.TextColor3 = defaultKey and Color3.fromRGB(0, 255, 150) or Color3.fromRGB(140, 140, 150)
     BindBtn.Parent = controls
     
     local StrokeBind = Instance.new("UIStroke", BindBtn)
@@ -300,7 +312,7 @@ local function AddKeybindButton(controls, defaultKey, callback)
     local listening = false
     BindBtn.MouseButton1Click:Connect(function()
         listening = true
-        BindBtn.Text = "[ LISTENING ]"
+        BindBtn.Text = "[ PRESS KEY ]"
         BindBtn.TextColor3 = Color3.fromRGB(255, 150, 0)
     end)
     
@@ -308,9 +320,15 @@ local function AddKeybindButton(controls, defaultKey, callback)
         if not listening then return end
         if input.UserInputType == Enum.UserInputType.Keyboard then
             listening = false
-            BindBtn.Text = input.KeyCode.Name:upper()
-            BindBtn.TextColor3 = Color3.fromRGB(0, 255, 150)
-            callback(input.KeyCode)
+            if input.KeyCode == Enum.KeyCode.Escape then
+                BindBtn.Text = "[ NONE ]"
+                BindBtn.TextColor3 = Color3.fromRGB(140, 140, 150)
+                callback(nil)
+            else
+                BindBtn.Text = input.KeyCode.Name:upper()
+                BindBtn.TextColor3 = Color3.fromRGB(0, 255, 150)
+                callback(input.KeyCode)
+            end
         end
     end)
 end
@@ -319,15 +337,15 @@ end
 CreateTabButton("Main", "⚡")
 CreateTabButton("Settings", "⚙")
 
--- MAIN TAB ROWS
-local FlyControls = CreateRow("Fly Engine", MainTabFrame)
+-- MAIN TAB CONTROLS (With Clean Names)
+local FlyControls = CreateRow("Fly", MainTabFrame)
 AddSlider(FlyControls, 16, 250, FlySpeed, function(val) FlySpeed = val end)
-AddToggle(FlyControls, function(state) Flying = state end)
+AddToggle(FlyControls, "Fly", function(state) Flying = state end)
 
-local NoclipControls = CreateRow("Noclip System", MainTabFrame)
-AddToggle(NoclipControls, function(state) Noclip = state end)
+local NoclipControls = CreateRow("Noclip", MainTabFrame)
+AddToggle(NoclipControls, "Noclip", function(state) Noclip = state end)
 
-local SpeedControls = CreateRow("Speed Matrix", MainTabFrame)
+local SpeedControls = CreateRow("Speed", MainTabFrame)
 AddSlider(SpeedControls, 16, 150, HackSpeed, function(val)
     HackSpeed = val
     if SpeedHack then
@@ -336,15 +354,15 @@ AddSlider(SpeedControls, 16, 150, HackSpeed, function(val)
         if hum then hum.WalkSpeed = HackSpeed end
     end
 end)
-AddToggle(SpeedControls, function(state)
+AddToggle(SpeedControls, "Speed", function(state)
     SpeedHack = state
     local char = GetCharacter()
     local hum = char:FindFirstChildOfClass("Humanoid")
     if hum then hum.WalkSpeed = state and HackSpeed or NormalSpeed end
 end)
 
-local InvisControls = CreateRow("Stealth Invisibility", MainTabFrame)
-AddToggle(InvisControls, function(state)
+local InvisControls = CreateRow("Invisibility", MainTabFrame)
+AddToggle(InvisControls, "Invis", function(state)
     Invisible = state
     local character = GetCharacter()
     local root = character:FindFirstChild("HumanoidRootPart")
@@ -385,16 +403,24 @@ AddToggle(InvisControls, function(state)
     end
 end)
 
--- SETTINGS TAB ROWS
+-- SETTINGS TAB CONTROLS (With Clean Names)
 local UIKeybindRow = CreateRow("UI Menu Toggle Bind", SettingsTabFrame)
-AddKeybindButton(UIKeybindRow, MenuKeybind, function(newKey)
-    MenuKeybind = newKey
-end)
+AddKeybindButton(UIKeybindRow, MenuKeybind, function(newKey) MenuKeybind = newKey end)
 
--- --- FLUID MINIMIZATION ENGINE ---
+local FlyKeybindRow = CreateRow("Fly Feature Keybind", SettingsTabFrame)
+AddKeybindButton(FlyKeybindRow, FlyKeybind, function(newKey) FlyKeybind = newKey end)
+
+local NoclipKeybindRow = CreateRow("Noclip Feature Keybind", SettingsTabFrame)
+AddKeybindButton(NoclipKeybindRow, NoclipKeybind, function(newKey) NoclipKeybind = newKey end)
+
+local SpeedKeybindRow = CreateRow("Speed Feature Keybind", SettingsTabFrame)
+AddKeybindButton(SpeedKeybindRow, SpeedKeybind, function(newKey) SpeedKeybind = newKey end)
+
+-- --- FIXED ANCHOR MINIMIZATION ENGINE ---
 local MinCircle = Instance.new("TextButton")
 MinCircle.Size = UDim2.fromOffset(55, 55)
-MinCircle.Position = UDim2.new(1, -75, 1, -75)
+MinCircle.Position = UDim2.new(1, -60, 1, -60)
+MinCircle.AnchorPoint = Vector2.new(0.5, 0.5)
 MinCircle.BackgroundColor3 = Color3.fromRGB(15, 15, 22)
 MinCircle.Text = "S"
 MinCircle.Font = Enum.Font.GothamBold
@@ -410,17 +436,15 @@ CircleStroke.Thickness = 1.5
 
 MinBtn.MouseButton1Click:Connect(function()
     IsMinimized = true
-    -- Animate Menu disappearing smoothly down and collapsing
-    local originalPos = Frame.Position
+    
     local collapseTween = CreateTween(Frame, {0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In}, {
         Size = UDim2.fromOffset(0, 0),
-        Position = UDim2.new(1, -75, 1, -75)
+        Position = UDim2.new(1, -60, 1, -60)
     })
     
     collapseTween.Completed:Wait()
     Frame.Visible = false
     
-    -- Pop out minimized circle with a spring/bounce effect
     MinCircle.Visible = true
     MinCircle.Size = UDim2.fromOffset(0, 0)
     CreateTween(MinCircle, {0.4, Enum.EasingStyle.Elastic, Enum.EasingDirection.Out}, {
@@ -430,24 +454,23 @@ end)
 
 MinCircle.MouseButton1Click:Connect(function()
     IsMinimized = false
-    -- Pop out minimized circle inwards
+    
     local popCircle = CreateTween(MinCircle, {0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In}, {
         Size = UDim2.fromOffset(0, 0)
     })
     popCircle.Completed:Wait()
     MinCircle.Visible = false
     
-    -- Restore core dashboard setup with a clean expansion spring
     Frame.Visible = true
     CreateTween(Frame, {0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out}, {
         Size = UDim2.fromOffset(500, 380),
-        Position = UDim2.new(0.5, -250, 0.5, -190)
+        Position = UDim2.new(0.5, 0, 0.5, 0)
     })
 end)
 
 -- --- MECHANICS LOOPS ---
 
--- Drone Positioning Logic (Enhanced Speed Engine Added)
+-- Drone Positioning Logic (High Speed Response Engine)
 RunService.RenderStepped:Connect(function(deltaTime)
     if not Invisible or not DroneNode then return end
     
@@ -459,7 +482,6 @@ RunService.RenderStepped:Connect(function(deltaTime)
     if UIS:IsKeyDown(Enum.KeyCode.A) then moveVector -= cameraCFrame.RightVector end
     if UIS:IsKeyDown(Enum.KeyCode.D) then moveVector += cameraCFrame.RightVector end
     
-    -- Use SpeedHack modifier if speed toggles are active, otherwise apply enhanced baseline DroneSpeed
     local speedMultiplier = SpeedHack and HackSpeed or DroneSpeed
     
     if moveVector.Magnitude > 0 then
@@ -470,7 +492,6 @@ RunService.RenderStepped:Connect(function(deltaTime)
             targetPosition = Vector3.new(targetPosition.X, SavedPosition.Position.Y + 2, targetPosition.Z)
         end
         
-        -- High frequency responsive interpolation step
         DroneNode.Position = DroneNode.Position:Lerp(targetPosition, math.clamp(deltaTime * 24, 0, 1))
     end
 end)
@@ -508,13 +529,25 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- Dynamic Rebindable Key Handler 
+-- Dynamic Rebindable Key & Master Controls Handler 
 UIS.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
+    
+    -- Main Menu Toggle
     if input.KeyCode == MenuKeybind then
-        if IsMinimized then return end -- Guard behavior if iconified
+        if IsMinimized then return end
         MenuOpen = not MenuOpen
         Frame.Visible = MenuOpen
+    
+    -- Optional Feature Bind Checks
+    elseif FlyKeybind and input.KeyCode == FlyKeybind then
+        if ToggleButtonsMap["Fly"] then ToggleButtonsMap["Fly"]() end
+        
+    elseif NoclipKeybind and input.KeyCode == NoclipKeybind then
+        if ToggleButtonsMap["Noclip"] then ToggleButtonsMap["Noclip"]() end
+        
+    elseif SpeedKeybind and input.KeyCode == SpeedKeybind then
+        if ToggleButtonsMap["Speed"] then ToggleButtonsMap["Speed"]() end
     end
 end)
 
