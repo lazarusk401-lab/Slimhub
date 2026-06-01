@@ -13,11 +13,14 @@ end
 local Flying = false
 local Noclip = false
 local SpeedHack = false
+local Invisible = false
 
 local FlySpeed = 50
 local NormalSpeed = 16
 local HackSpeed = 100
 local IsMinimized = false
+
+local InvisClone = nil
 
 -- --- MODERN UI CREATION ---
 local Gui = Instance.new("ScreenGui")
@@ -27,8 +30,8 @@ Gui.Parent = Player.PlayerGui
 
 -- Main Panel
 local Frame = Instance.new("Frame")
-Frame.Size = UDim2.fromOffset(420, 320)
-Frame.Position = UDim2.new(0.5, -210, 0.5, -160)
+Frame.Size = UDim2.fromOffset(420, 360) -- Slightly taller to fit the new feature
+Frame.Position = UDim2.new(0.5, -210, 0.5, -180)
 Frame.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
 Frame.BorderSizePixel = 0
 Frame.ClipsDescendants = true
@@ -96,7 +99,6 @@ local function CreateTween(obj, info, propertyTable)
     return tween
 end
 
--- Fixed Layout Rows (Two Distinct Columns to Stop Overlapping)
 local function CreateRow(name, layoutOrder)
     local Row = Instance.new("Frame")
     Row.Size = UDim2.new(1, 0, 0, 50)
@@ -106,7 +108,6 @@ local function CreateRow(name, layoutOrder)
     Row.Parent = Container
     Instance.new("UICorner", Row).CornerRadius = UDim.new(0, 6)
     
-    -- Left Side: Text Label
     local Label = Instance.new("TextLabel")
     Label.Size = UDim2.new(0.35, 0, 1, 0)
     Label.Position = UDim2.fromOffset(12, 0)
@@ -118,7 +119,6 @@ local function CreateRow(name, layoutOrder)
     Label.TextXAlignment = Enum.TextXAlignment.Left
     Label.Parent = Row
     
-    -- Right Side: Controls Wrapper
     local Controls = Instance.new("Frame")
     Controls.Size = UDim2.new(0.65, -12, 1, 0)
     Controls.Position = UDim2.new(0.35, 0, 0, 0)
@@ -253,6 +253,27 @@ AddToggle(SpeedControls, function(state)
     end
 end)
 
+-- Invisibility Row
+local InvisControls = CreateRow("Invisibility", 4)
+AddToggle(InvisControls, function(state)
+    Invisible = state
+    local character = GetCharacter()
+    
+    if Invisible then
+        -- Exploit Trick: Break Motor6D joints locally. 
+        -- To the server, your parts fall to the ground or vanish, making you invisible,
+        -- but locally we manage your positions so you can still run around.
+        for _, v in ipairs(character:GetDescendants()) do
+            if v:IsA("Motor6D") and v.Name ~= "Neck" then
+                v:Destroy()
+            end
+        end
+    else
+        -- Force a respawn/refresh to bring the real character back safely
+        Player:LoadCharacter()
+    end
+end)
+
 -- --- MINIMIZE SYSTEM ---
 MinBtn.MouseButton1Click:Connect(function()
     IsMinimized = not IsMinimized
@@ -260,7 +281,7 @@ MinBtn.MouseButton1Click:Connect(function()
         CreateTween(Frame, {0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out}, {Size = UDim2.fromOffset(420, 45)})
         MinBtn.Text = "+"
     else
-        CreateTween(Frame, {0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out}, {Size = UDim2.fromOffset(420, 320)})
+        CreateTween(Frame, {0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out}, {Size = UDim2.fromOffset(420, 360)})
         MinBtn.Text = "-"
     end
 end)
@@ -302,7 +323,7 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- Loop to catch character respawns for speed
+-- Speed Maintainer Loop
 task.spawn(function()
     while task.wait(1) do
         pcall(function()
