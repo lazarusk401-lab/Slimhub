@@ -26,7 +26,6 @@ local MenuOpen = true
 
 -- Advanced Camera State Variables
 local SavedPosition = nil
-local CamRenderLoop = nil
 local CamX, CamY = 0, 0
 local TargetCamX, TargetCamY = 0, 0
 local VirtualCamPos = Vector3.zero
@@ -285,7 +284,6 @@ AddToggle(InvisControls, function(state)
         
         -- 3. Transition control state to Scriptable
         Camera.CameraType = Enum.CameraType.Scriptable
-        UIS.MouseBehavior = Enum.MouseBehavior.LockCurrentPosition
     else
         -- 1. Revert to standard camera modes safely
         Camera.CameraType = Enum.CameraType.Custom
@@ -327,6 +325,9 @@ end)
 -- Free-Look & Ultra-Smooth Cinematic Tracking Loop
 RunService.RenderStepped:Connect(function(deltaTime)
     if not Invisible then return end
+    
+    -- FORCE MOUSE TO CENTER EVERY FRAME TO PREVENT LOCK BREAKS
+    UIS.MouseBehavior = Enum.MouseBehavior.LockCurrentPosition
     
     -- Capture continuous mouse motion variables
     local delta = UIS:GetMouseDelta()
