@@ -1,13 +1,9 @@
-task.wait(1)
-
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Player = Players.LocalPlayer
-local ToggleInvisEvent = ReplicatedStorage:WaitForChild("ToggleInvis")
 
 local function GetCharacter()
     return Player.Character or Player.CharacterAdded:Wait()
@@ -23,14 +19,17 @@ local FlySpeed = 50
 local NormalSpeed = 16
 local HackSpeed = 100
 local IsMinimized = false
-local MenuOpen = true
+
+-- Track original transparencies for restoring visibility
+local originalTransparencies = {}
 
 -- --- MODERN UI CREATION ---
 local Gui = Instance.new("ScreenGui")
 Gui.Name = "SlimHub"
 Gui.ResetOnSpawn = false
-Gui.Parent = Player:WaitForChild("PlayerGui")
+Gui.Parent = Player.PlayerGui
 
+-- Main Panel
 local Frame = Instance.new("Frame")
 Frame.Size = UDim2.fromOffset(420, 360)
 Frame.Position = UDim2.new(0.5, -210, 0.5, -180)
@@ -44,6 +43,7 @@ local Stroke = Instance.new("UIStroke", Frame)
 Stroke.Color = Color3.fromRGB(40, 40, 45)
 Stroke.Thickness = 1.5
 
+-- Top Bar / Drag Handle
 local TopBar = Instance.new("Frame")
 TopBar.Size = UDim2.new(1, 0, 0, 45)
 TopBar.BackgroundColor3 = Color3.fromRGB(22, 22, 26)
@@ -64,13 +64,14 @@ local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, -60, 1, 0)
 Title.Position = UDim2.fromOffset(15, 0)
 Title.BackgroundTransparency = 1
-Title.Text = "SLIMHUB // CLIENT [RSHIFT]"
+Title.Text = "SLIMHUB // CLIENT"
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 16
 Title.TextColor3 = Color3.fromRGB(0, 255, 130)
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Parent = TopBar
 
+-- Minimize Button
 local MinBtn = Instance.new("TextButton")
 MinBtn.Size = UDim2.fromOffset(30, 30)
 MinBtn.Position = UDim2.new(1, -40, 0.5, -15)
@@ -81,6 +82,7 @@ MinBtn.TextSize = 20
 MinBtn.TextColor3 = Color3.fromRGB(150, 150, 155)
 MinBtn.Parent = TopBar
 
+-- UI Layout Container
 local Container = Instance.new("Frame")
 Container.Size = UDim2.new(1, -30, 1, -65)
 Container.Position = UDim2.fromOffset(15, 55)
@@ -224,13 +226,16 @@ end
 
 -- --- BUILDING THE INTERFACE ---
 
+-- Fly Row
 local FlyControls = CreateRow("Fly Hack", 1)
 AddSlider(FlyControls, 16, 250, FlySpeed, function(val) FlySpeed = val end)
 AddToggle(FlyControls, function(state) Flying = state end)
 
+-- Noclip Row
 local NoclipControls = CreateRow("Noclip", 2)
 AddToggle(NoclipControls, function(state) Noclip = state end)
 
+-- Speed Row
 local SpeedControls = CreateRow("Speed Hack", 3)
 AddSlider(SpeedControls, 16, 150, HackSpeed, function(val)
     HackSpeed = val
@@ -249,12 +254,31 @@ AddToggle(SpeedControls, function(state)
     end
 end)
 
--- Safe & Working Invisibility Row
+-- Invisibility Row
 local InvisControls = CreateRow("Invisibility", 4)
 AddToggle(InvisControls, function(state)
     Invisible = state
-    -- Fire event to server script to handle true transparency safely
-    ToggleInvisEvent:FireServer(Invisible)
+    local character = GetCharacter()
+    
+    if Invisible then
+        -- Set to 0.99 transparency so physics remain active and un-frozen
+        for _, v in ipairs(character:GetDescendants()) do
+            if v:IsA("BasePart") or v:IsA("Decal") then
+                if v.Name ~= "HumanoidRootPart" then
+                    originalTransparencies[v] = v.Transparency
+                    v.Transparency = 0.99
+                end
+            end
+        end
+    else
+        -- Cleanly restore visible states upon toggling off
+        for part, originalValue in pairs(originalTransparencies) do
+            if part and part.Parent then
+                part.Transparency = originalValue
+            end
+        end
+        table.clear(originalTransparencies)
+    end
 end)
 
 -- --- MINIMIZE SYSTEM ---
@@ -266,15 +290,6 @@ MinBtn.MouseButton1Click:Connect(function()
     else
         CreateTween(Frame, {0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out}, {Size = UDim2.fromOffset(420, 360)})
         MinBtn.Text = "-"
-    end
-end)
-
--- --- KEYBIND TO SHOW/HIDE CLIENT (RSHIFT) ---
-UIS.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.KeyCode == Enum.KeyCode.RightShift then
-        MenuOpen = not MenuOpen
-        Frame.Visible = MenuOpen
     end
 end)
 
@@ -294,3 +309,77 @@ RunService.RenderStepped:Connect(function()
     if UIS:IsKeyDown(Enum.KeyCode.S) then Move -= Cam.CFrame.LookVector end
     if UIS:IsKeyDown(Enum.KeyCode.A) then Move -= Cam.CFrame.RightVector end
     if UIS:IsKeyDown(Enum.KeyCode.D) then Move += Cam.CFrame.RightVector end
+    if UIS:IsKeyDown(Enum.KeyCode.Space) then Move += Vector3.yAxis end
+    if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then Move -= Vector3.yAxis end
+
+    if Move.Magnitude > 0 then
+        Root.AssemblyLinearVelocity = Move.Unit * FlySpeed
+    else
+        Root.AssemblyLinearVelocity = Vector3.zero
+    end
+end)
+
+-- Noclip Engine
+RunService.Stepped:Connect(function()
+    if not Noclip then return end
+    local Character = GetCharacter()
+    for _, v in ipairs(Character:GetDescendants()) do
+        if v:IsA("BasePart") then
+            v.CanCollide = false
+        end
+    end
+end)
+
+-- Speed Maintainer Loop
+task.spawn(function()
+    while task.wait(1) do
+        pcall(function()
+            local char = Player.Character
+            if char then
+                local hum = char:FindFirstChildOfClass("Humanoid")
+                if hum then
+                    hum.WalkSpeed = SpeedHack and HackSpeed or NormalSpeed
+                end
+            end
+        end)
+    end
+end)
+
+-- --- DRAGGING SYSTEM ---
+local Dragging, DragInput, DragStart, StartPos
+
+local function UpdateDrag(input)
+    local delta = input.Position - DragStart
+    Frame.Position = UDim2.new(
+        StartPos.X.Scale,
+        StartPos.X.Offset + delta.X,
+        StartPos.Y.Scale,
+        StartPos.Y.Offset + delta.Y
+    )
+end
+
+TopBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        Dragging = true
+        DragStart = input.Position
+        StartPos = Frame.Position
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                Dragging = false
+            end
+        end)
+    end
+end)
+
+TopBar.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        DragInput = input
+    end
+end)
+
+UIS.InputChanged:Connect(function(input)
+    if input == DragInput and Dragging then
+        UpdateDrag(input)
+    end
+end)
