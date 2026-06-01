@@ -149,33 +149,66 @@ local function CreateTween(obj, info, propertyTable)
     return tween
 end
 
-local function CreateTabButton(name, iconText)
+local function CreateTabButton(name, customIconId)
     local Btn = Instance.new("TextButton")
     Btn.Size = UDim2.new(1, -10, 0, 40)
     Btn.Position = UDim2.fromOffset(5, 0)
     Btn.BackgroundTransparency = 1
-    Btn.Text = "  " .. iconText .. "  " .. name:upper()
-    Btn.Font = Enum.Font.GothamMedium
-    Btn.TextSize = 12
-    Btn.TextColor3 = name == "Main" and Color3.fromRGB(0, 255, 150) or Color3.fromRGB(140, 140, 150)
-    Btn.TextXAlignment = Enum.TextXAlignment.Left
+    Btn.Text = "" -- Text removed for custom structure layouts
     Btn.Parent = Sidebar
+    Btn.Name = name:upper()
+    
+    local Label = Instance.new("TextLabel")
+    Label.BackgroundTransparency = 1
+    Label.Font = Enum.Font.GothamMedium
+    Label.TextSize = 12
+    Label.Text = name:upper()
+    Label.TextColor3 = name == "Main" and Color3.fromRGB(0, 255, 150) or Color3.fromRGB(140, 140, 150)
+    Label.Parent = Btn
+
+    if customIconId then
+        -- Set up image format for Settings icon tab layouts
+        local Icon = Instance.new("ImageLabel")
+        Icon.Size = UDim2.fromOffset(16, 16)
+        Icon.Position = UDim2.fromOffset(12, 12)
+        Icon.BackgroundTransparency = 1
+        Icon.Image = customIconId
+        Icon.ImageColor3 = name == "Main" and Color3.fromRGB(0, 255, 150) or Color3.fromRGB(140, 140, 150)
+        Icon.Parent = Btn
+        Btn:SetAttribute("IconRef", Icon)
+        
+        Label.Size = UDim2.new(1, -40, 1, 0)
+        Label.Position = UDim2.fromOffset(36, 0)
+        Label.TextXAlignment = Enum.TextXAlignment.Left
+    else
+        Label.Size = UDim2.new(1, -15, 1, 0)
+        Label.Position = UDim2.fromOffset(15, 0)
+        Label.TextXAlignment = Enum.TextXAlignment.Left
+    end
     
     Btn.MouseButton1Click:Connect(function()
         ActiveTab = name
+        local mainBtn = Sidebar:FindFirstChild("MAIN")
+        local settingsBtn = Sidebar:FindFirstChild("SETTINGS")
+        
         if ActiveTab == "Main" then
             MainTabFrame.Visible = true
             SettingsTabFrame.Visible = false
-            Btn.TextColor3 = Color3.fromRGB(0, 255, 150)
-            Sidebar:FindFirstChild("SETTINGS").TextColor3 = Color3.fromRGB(140, 140, 150)
+            mainBtn.TextLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
+            settingsBtn.TextLabel.TextColor3 = Color3.fromRGB(140, 140, 150)
+            if settingsBtn:GetAttribute("IconRef") then
+                settingsBtn:GetAttribute("IconRef").ImageColor3 = Color3.fromRGB(140, 140, 150)
+            end
         else
             MainTabFrame.Visible = false
             SettingsTabFrame.Visible = true
-            Btn.TextColor3 = Color3.fromRGB(0, 255, 150)
-            Sidebar:FindFirstChild("MAIN").TextColor3 = Color3.fromRGB(140, 140, 150)
+            settingsBtn.TextLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
+            mainBtn.TextLabel.TextColor3 = Color3.fromRGB(140, 140, 150)
+            if settingsBtn:GetAttribute("IconRef") then
+                settingsBtn:GetAttribute("IconRef").ImageColor3 = Color3.fromRGB(0, 255, 150)
+            end
         end
     end)
-    Btn.Name = name:upper()
 end
 
 local function CreateRow(name, parentContainer)
@@ -333,11 +366,11 @@ local function AddKeybindButton(controls, defaultKey, callback)
     end)
 end
 
--- --- BUILD TABS ---
-CreateTabButton("Main", "⚡")
-CreateTabButton("Settings", "⚙")
+-- --- BUILD TABS (No Emojis, Asset ID Linked to Image Target Focus) ---
+CreateTabButton("Main", nil)
+CreateTabButton("Settings", "rbxassetid://128091171804797")
 
--- MAIN TAB CONTROLS (With Clean Names)
+-- MAIN TAB CONTROLS
 local FlyControls = CreateRow("Fly", MainTabFrame)
 AddSlider(FlyControls, 16, 250, FlySpeed, function(val) FlySpeed = val end)
 AddToggle(FlyControls, "Fly", function(state) Flying = state end)
@@ -403,7 +436,7 @@ AddToggle(InvisControls, "Invis", function(state)
     end
 end)
 
--- SETTINGS TAB CONTROLS (With Clean Names)
+-- SETTINGS TAB CONTROLS
 local UIKeybindRow = CreateRow("UI Menu Toggle Bind", SettingsTabFrame)
 AddKeybindButton(UIKeybindRow, MenuKeybind, function(newKey) MenuKeybind = newKey end)
 
