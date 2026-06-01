@@ -20,7 +20,8 @@ local NormalSpeed = 16
 local HackSpeed = 100
 local IsMinimized = false
 
-local InvisClone = nil
+-- Track original transparencies for restoring visibility
+local originalTransparencies = {}
 
 -- --- MODERN UI CREATION ---
 local Gui = Instance.new("ScreenGui")
@@ -30,7 +31,7 @@ Gui.Parent = Player.PlayerGui
 
 -- Main Panel
 local Frame = Instance.new("Frame")
-Frame.Size = UDim2.fromOffset(420, 360) -- Slightly taller to fit the new feature
+Frame.Size = UDim2.fromOffset(420, 360)
 Frame.Position = UDim2.new(0.5, -210, 0.5, -180)
 Frame.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
 Frame.BorderSizePixel = 0
@@ -260,17 +261,23 @@ AddToggle(InvisControls, function(state)
     local character = GetCharacter()
     
     if Invisible then
-        -- Exploit Trick: Break Motor6D joints locally. 
-        -- To the server, your parts fall to the ground or vanish, making you invisible,
-        -- but locally we manage your positions so you can still run around.
+        -- Make character transparent locally while keeping physics intact
         for _, v in ipairs(character:GetDescendants()) do
-            if v:IsA("Motor6D") and v.Name ~= "Neck" then
-                v:Destroy()
+            if v:IsA("BasePart") or v:IsA("Decal") then
+                if v.Name ~= "HumanoidRootPart" then
+                    originalTransparencies[v] = v.Transparency
+                    v.Transparency = 1
+                end
             end
         end
     else
-        -- Force a respawn/refresh to bring the real character back safely
-        Player:LoadCharacter()
+        -- Restore original visibility states cleanly
+        for part, originalValue in pairs(originalTransparencies) do
+            if part and part.Parent then
+                part.Transparency = originalValue
+            end
+        end
+        table.clear(originalTransparencies)
     end
 end)
 
