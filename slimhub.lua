@@ -45,7 +45,6 @@ local ESPObjects = {}
 local ToggleCallbacks = {}
 local Dragging = false
 local DragOffset = Vector2.zero
-local TargetPosition = nil
 local DroneNode = nil
 local SavedPosition = nil
 
@@ -99,20 +98,23 @@ Title.TextColor3 = Color3.fromRGB(0, 255, 150)
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Parent = TopBar
 
--- Dragging Functionality Fixed (Handles AnchorPoint correctly)
+-- Hardware-aligned Dragging Logic (Fixes mouse separation completely)
+local DragConnection
 TopBar.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         Dragging = true
         local mousePos = UIS:GetMouseLocation()
-        DragOffset = mousePos - Vector2.new(MainFrame.AbsolutePosition.X + (MainFrame.AbsoluteSize.X * MainFrame.AnchorPoint.X), MainFrame.AbsolutePosition.Y + (MainFrame.AbsoluteSize.Y * MainFrame.AnchorPoint.Y))
         
-        local connection
-        connection = UIS.InputChanged:Connect(function(changedInput)
+        -- Calculate exact offset relative to center anchor
+        local frameCenter = MainFrame.AbsolutePosition + (MainFrame.AbsoluteSize * 0.5)
+        DragOffset = mousePos - frameCenter
+        
+        if DragConnection then DragConnection:Disconnect() end
+        
+        DragConnection = UIS.InputChanged:Connect(function(changedInput)
             if Dragging and (changedInput.UserInputType == Enum.UserInputType.MouseMovement or changedInput.UserInputType == Enum.UserInputType.Touch) then
-                local currentMousePos = UIS:GetMouseLocation()
-                TargetPosition = UDim2.new(0, currentMousePos.X - DragOffset.X, 0, currentMousePos.Y - DragOffset.Y)
-            else
-                connection:Disconnect()
+                local currentMouse = UIS:GetMouseLocation()
+                MainFrame.Position = UDim2.fromOffset(currentMouse.X - DragOffset.X, currentMouse.Y - DragOffset.Y)
             end
         end)
     end
@@ -121,6 +123,10 @@ end)
 UIS.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         Dragging = false
+        if DragConnection then
+            DragConnection:Disconnect()
+            DragConnection = nil
+        end
     end
 end)
 
@@ -336,7 +342,6 @@ local function CreateToggle(parent, text, configKey, callback)
     ToggleCallbacks[configKey] = Update
 end
 
--- SLIDER WITH HOVER ANIMATIONS
 local function CreateSlider(parent, text, configKey, min, max, callback)
     local Row = Instance.new("Frame")
     Row.Size = UDim2.new(1, 0, 0, 50)
@@ -526,7 +531,7 @@ local function CreateKeybindButton(parent, text, configKey, callback)
     end)
 end
 
--- Build Main Tab
+-- Build Tabs
 local MainSection = CreateSection(Tabs.Main, "Movement")
 CreateToggle(MainSection, "Fly", "Flying")
 CreateSlider(MainSection, "Fly Speed", "FlySpeed", 16, 250)
@@ -590,14 +595,12 @@ end)
 CreateToggle(MainSection, "Infinite Jump", "InfiniteJump")
 CreateToggle(MainSection, "Click TP (Ctrl+Click)", "ClickTP")
 
--- Build ESP Tab
 local ESPSection = CreateSection(Tabs.ESP, "Visuals")
 CreateToggle(ESPSection, "ESP Enabled", "ESPEnabled")
 CreateToggle(ESPSection, "Show Tracers", "ESPTracers")
 CreateToggle(ESPSection, "Show Names", "ESPNames")
 CreateToggle(ESPSection, "Rainbow Mode", "ESPRainbow")
 
--- Build Prison Tab
 local PrisonSection = CreateSection(Tabs.Prison, "Combat")
 CreateToggle(PrisonSection, "Silent Aim", "SilentAim")
 CreateSlider(PrisonSection, "FOV Size", "SilentAimFOV", 50, 400)
@@ -640,14 +643,13 @@ HitboxBtn.MouseButton1Click:Connect(function()
     HitboxBtn.Text = Config.SilentAimHitbox:upper()
 end)
 
--- Build Settings Tab
 local SettingsSection = CreateSection(Tabs.Settings, "Keybinds")
 CreateKeybindButton(SettingsSection, "Menu Toggle", "MenuKeybind")
 CreateKeybindButton(SettingsSection, "Fly Toggle", "FlyKeybind")
 CreateKeybindButton(SettingsSection, "Noclip Toggle", "NoclipKeybind")
 CreateKeybindButton(SettingsSection, "Speed Toggle", "SpeedKeybind")
 
--- ESP Drawing Objects
+-- ESP Drawing Setup
 local function CreateESP(player)
     if ESPObjects[player] then return end
     
@@ -689,7 +691,6 @@ for _, p in ipairs(Players:GetPlayers()) do
     if p ~= Player then CreateESP(p) end
 end
 
--- FOV Circle
 local FOVCircle = Drawing.new("Circle")
 FOVCircle.Visible = false
 FOVCircle.Thickness = 1.5
@@ -697,7 +698,6 @@ FOVCircle.Color = Color3.fromRGB(0, 255, 150)
 FOVCircle.Filled = false
 FOVCircle.NumSides = 64
 
--- Silent Aim
 local function GetTarget()
     local mousePos = UIS:GetMouseLocation()
     local closest = nil
@@ -741,7 +741,7 @@ local function GetTarget()
     return closest
 end
 
--- Hook Prison Life
+-- Hook Prison Life Weapons
 for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
     if obj:IsA("RemoteEvent") then
         local name = obj.Name:lower()
@@ -771,21 +771,8 @@ for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
     end
 end
 
--- Loops
+-- Global Engine Loops
 RunService.RenderStepped:Connect(function()
-    -- Smooth dragging
-    if Dragging and TargetPosition then
-        local current = MainFrame.Position
-        local target = TargetPosition
-        local smooth = UDim2.new(
-            current.X.Scale,
-            current.X.Offset + (target.X.Offset - current.X.Offset) * 0.3,
-            current.Y.Scale,
-            current.Y.Offset + (target.Y.Offset - current.Y.Offset) * 0.3
-        )
-        MainFrame.Position = smooth
-    end
-    
     -- Fly
     if Config.Flying then
         local char = Player.Character
@@ -843,7 +830,7 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- ESP Loop
+-- Visuals Updates Loop
 RunService.RenderStepped:Connect(function()
     local rainbowColor = Color3.fromHSV((tick() * 0.5) % 1, 1, 1)
     local espColor = Config.ESPRainbow and rainbowColor or Color3.fromRGB(0, 255, 150)
