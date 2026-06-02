@@ -25,6 +25,10 @@ local SavedPosition = nil
 local MenuPositionBeforeMinimize = UDim2.new(0.5, 0, 0.5, 0)
 local ShootRemotes = {}
 
+local FlyVelocity = nil
+local FlyGyro = nil
+local AnimationTrack = nil
+
 local Gui = Instance.new("ScreenGui")
 Gui.Name = "SlimHub"
 Gui.ResetOnSpawn = false
@@ -383,22 +387,54 @@ local function CreateKeybindButton(parent, text, configKey, callback)
 end
 
 local MainSection = CreateSection(Tabs.Main, "Movement")
-local BodyVelocity, BodyGyro
 
-local function CleanFlightInstances()
-    if BodyVelocity then BodyVelocity:Destroy(); BodyVelocity = nil end
-    if BodyGyro then BodyGyro:Destroy(); BodyGyro = nil end
+local function ClearFlight()
+    if FlyVelocity then FlyVelocity:Destroy(); FlyVelocity = nil end
+    if FlyGyro then FlyGyro:Destroy(); FlyGyro = nil end
+    if AnimationTrack then AnimationTrack:Stop(); AnimationTrack:Destroy(); AnimationTrack = nil end
 end
 
-CreateToggle(MainSection, "Fly", "Flying", function(state)
-    CleanFlightInstances()
+local function StartFlight()
+    ClearFlight()
     local char = Player.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     local hum = char and char:FindFirstChildOfClass("Humanoid")
-    if not state and root and hum then
-        hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+    if not root or not hum then return end
+    
+    FlyVelocity = Instance.new("BodyVelocity")
+    FlyVelocity.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+    FlyVelocity.Velocity = Vector3.zero
+    FlyVelocity.Parent = root
+    
+    FlyGyro = Instance.new("BodyGyro")
+    FlyGyro.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
+    FlyGyro.P = 1e4
+    FlyGyro.CFrame = Camera.CFrame
+    FlyGyro.Parent = root
+    
+    local animProvider = hum:FindFirstChildOfClass("Animator") or Instance.new("Animator", hum)
+    local flyAnim = Instance.new("Animation")
+    flyAnim.AnimationId = "rbxassetid://616006778"
+    
+    pcall(function()
+        AnimationTrack = animProvider:LoadAnimation(flyAnim)
+        AnimationTrack.Priority = Enum.AnimationPriority.Movement
+        AnimationTrack:Play(0.2)
+        AnimationTrack:AdjustSpeed(0)
+    end)
+end
+
+CreateToggle(MainSection, "Fly", "Flying", function(state)
+    if state then
+        StartFlight()
+    else
+        ClearFlight()
+        local char = Player.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if hum then hum:ChangeState(Enum.HumanoidStateType.GettingUp) end
     end
 end)
+
 CreateSlider(MainSection, "Fly Speed", "FlySpeed", 16, 250)
 CreateToggle(MainSection, "Speed Hack", "SpeedHack", function(state)
     local char = Player.Character or Player.CharacterAdded:Wait()
@@ -626,7 +662,7 @@ if hookmetamethod then
 end
 
 Player.CharacterAdding:Connect(function()
-    CleanFlightInstances()
+    ClearFlight()
     Config.Flying = false
     if ToggleCallbacks.Flying then ToggleCallbacks.Flying(false) end
 end)
@@ -637,18 +673,8 @@ RunService.RenderStepped:Connect(function()
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     
     if Config.Flying and root and hum then
-        if not BodyVelocity or BodyVelocity.Parent ~= root then
-            CleanFlightInstances()
-            BodyVelocity = Instance.new("BodyVelocity")
-            BodyVelocity.MaxForce = Vector3.new(1e5, 1e5, 1e5)
-            BodyVelocity.Velocity = Vector3.zero
-            BodyVelocity.Parent = root
-            
-            BodyGyro = Instance.new("BodyGyro")
-            BodyGyro.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
-            BodyGyro.P = 1e4
-            BodyGyro.CFrame = Camera.CFrame
-            BodyGyro.Parent = root
+        if not FlyVelocity or FlyVelocity.Parent ~= root or not FlyGyro or FlyGyro.Parent ~= root then
+            StartFlight()
         end
         
         hum:ChangeState(Enum.HumanoidStateType.Freefall)
@@ -661,14 +687,32 @@ RunService.RenderStepped:Connect(function()
         if UIS:IsKeyDown(Enum.KeyCode.Space) then moveDir += Vector3.yAxis end
         if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then moveDir -= Vector3.yAxis end
         
-        BodyGyro.CFrame = Camera.CFrame
+        local look = Camera.CFrame.LookVector
+        local targetRotation = CFrame.new(root.Position, root.Position + Vector3.new(look.X, 0, look.Z))
+        
         if moveDir.Magnitude > 0 then
-            BodyVelocity.Velocity = moveDir.Unit * Config.FlySpeed
+            FlyVelocity.Velocity = moveDir.Unit * Config.FlySpeed
+            if AnimationTrack then AnimationTrack:AdjustSpeed(1) end
+            
+            local horizontalMove = Vector3.new(moveDir.X, 0, moveDir.Z)
+            if horizontalMove.Magnitude > 0 then
+                local forwardSpace = root.CFrame:VectorToWorldSpace(Vector3.new(0, 0, -1))
+                local dot = horizontalMove.Unit:Dot(forwardSpace)
+                local rightSpace = root.CFrame:VectorToWorldSpace(Vector3.new(1, 0, 0))
+                local rightDot = horizontalMove.Unit:Dot(rightSpace)
+                
+                local tiltAngle = math.rad(-15) * math.clamp(dot, -1, 1)
+                local rollAngle = math.rad(-15) * math.clamp(rightDot, -1, 1)
+                targetRotation = targetRotation * CFrame.Angles(tiltAngle, 0, rollAngle)
+            end
         else
-            BodyVelocity.Velocity = Vector3.zero
+            FlyVelocity.Velocity = Vector3.zero
+            if AnimationTrack then AnimationTrack:AdjustSpeed(0) end
         end
+        
+        FlyGyro.CFrame = FlyGyro.CFrame:Lerp(targetRotation, 0.2)
     else
-        CleanFlightInstances()
+        ClearFlight()
     end
     
     if Config.Invisible and DronePosition and root then
