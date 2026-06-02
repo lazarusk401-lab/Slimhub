@@ -440,6 +440,4 @@ local function CreateSlider(parent, text, configKey, min, max, callback)
     
     local Fill = Instance.new("Frame")
     Fill.Size = UDim2.new((Config[configKey] - min) / (max - min), 0, 1, 0)
-    Fill.BackgroundColor3 = Color3.fromRGB(0, 255, 150)
-    Fill.BorderSizePixel = 0
-    Fill.Parent =
+    Fill.BackgroundColor3 = Color3.from
