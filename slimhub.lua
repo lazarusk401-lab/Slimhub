@@ -122,7 +122,7 @@ UIS.InputEnded:Connect(function(input)
     end
 end)
 
--- Structural Container for Menu Elements (Keeps layouts intact when collapsed)
+-- Structural Container for Menu Elements
 local WindowContainer = Instance.new("Frame")
 WindowContainer.Name = "WindowContainer"
 WindowContainer.Size = UDim2.new(1, 0, 1, -50)
@@ -131,7 +131,7 @@ WindowContainer.BackgroundTransparency = 1
 WindowContainer.ClipsDescendants = true
 WindowContainer.Parent = MainFrame
 
--- Sidebar (Parented inside Container)
+-- Sidebar
 local Sidebar = Instance.new("Frame")
 Sidebar.Size = UDim2.new(0, 130, 1, 0)
 Sidebar.Position = UDim2.fromOffset(0, 0)
@@ -142,7 +142,7 @@ Sidebar.Parent = WindowContainer
 local TabList = Instance.new("UIListLayout", Sidebar)
 TabList.Padding = UDim.new(0, 4)
 
--- Content Area (Parented inside Container)
+-- Content Area
 local ContentArea = Instance.new("Frame")
 ContentArea.Size = UDim2.new(1, -145, 1, -15)
 ContentArea.Position = UDim2.fromOffset(140, 10)
