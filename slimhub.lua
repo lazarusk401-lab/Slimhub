@@ -25,9 +25,8 @@ local SavedPosition = nil
 local MenuPositionBeforeMinimize = UDim2.new(0.5, 0, 0.5, 0)
 local ShootRemotes = {}
 
-local FlyAttachment = nil
-local FlyLinearVelocity = nil
-local FlyAlignOrientation = nil
+local FlyBodyVelocity = nil
+local FlyBodyGyro = nil
 local AnimationTrack = nil
 
 local Gui = Instance.new("ScreenGui")
@@ -390,16 +389,14 @@ end
 local MainSection = CreateSection(Tabs.Main, "Movement")
 
 local function ClearFlight()
-    if FlyLinearVelocity then FlyLinearVelocity:Destroy(); FlyLinearVelocity = nil end
-    if FlyAlignOrientation then FlyAlignOrientation:Destroy(); FlyAlignOrientation = nil end
-    if FlyAttachment then FlyAttachment:Destroy(); FlyAttachment = nil end
+    if FlyBodyVelocity then FlyBodyVelocity:Destroy(); FlyBodyVelocity = nil end
+    if FlyBodyGyro then FlyBodyGyro:Destroy(); FlyBodyGyro = nil end
     if AnimationTrack then AnimationTrack:Stop(); AnimationTrack:Destroy(); AnimationTrack = nil end
     
     local char = Player.Character
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     if hum then 
         hum.PlatformStand = false
-        hum:ChangeState(Enum.HumanoidStateType.GettingUp) 
     end
 end
 
@@ -410,29 +407,18 @@ local function StartFlight()
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     if not root or not hum then return end
     
-    hum.PlatformStand = true
-    hum:ChangeState(Enum.HumanoidStateType.Physics)
+    FlyBodyVelocity = Instance.new("BodyVelocity")
+    FlyBodyVelocity.Name = "SlimFlyVelocity_Legacy"
+    FlyBodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    FlyBodyVelocity.Velocity = Vector3.zero
+    FlyBodyVelocity.Parent = root
     
-    FlyAttachment = Instance.new("Attachment")
-    FlyAttachment.Name = "SlimFlyAttachment"
-    FlyAttachment.Parent = root
-    
-    FlyLinearVelocity = Instance.new("LinearVelocity")
-    FlyLinearVelocity.Name = "SlimFlyVelocity"
-    FlyLinearVelocity.Attachment0 = FlyAttachment
-    FlyLinearVelocity.MaxForce = math.huge
-    FlyLinearVelocity.VelocityConstraintMode = Enum.VelocityConstraintMode.Vector
-    FlyLinearVelocity.VectorVelocity = Vector3.zero
-    FlyLinearVelocity.Parent = root
-    
-    FlyAlignOrientation = Instance.new("AlignOrientation")
-    FlyAlignOrientation.Name = "SlimFlyOrientation"
-    FlyAlignOrientation.Attachment0 = FlyAttachment
-    FlyAlignOrientation.MaxTorque = math.huge
-    FlyAlignOrientation.Responsiveness = 200
-    FlyAlignOrientation.Mode = Enum.OrientationControlMode.OneAttachment
-    FlyAlignOrientation.CFrame = Camera.CFrame
-    FlyAlignOrientation.Parent = root
+    FlyBodyGyro = Instance.new("BodyGyro")
+    FlyBodyGyro.Name = "SlimFlyGyro_Legacy"
+    FlyBodyGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+    FlyBodyGyro.P = 15000
+    FlyBodyGyro.CFrame = Camera.CFrame
+    FlyBodyGyro.Parent = root
     
     local animProvider = hum:FindFirstChildOfClass("Animator") or Instance.new("Animator", hum)
     local flyAnim = Instance.new("Animation")
@@ -673,7 +659,7 @@ if hookmetamethod then
     local oldNamecall
     oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
         local method = getnamecallmethod()
-        if method == "FireServer" and Config.SilentAim and self:IsA("RemoteEvent") and (IsShootRemote(self) or table.find(ShootRemotes, self)) then
+        if method == "FireServer" and Config.SilentAim feeling self:IsA("RemoteEvent") and (IsShootRemote(self) or table.find(ShootRemotes, self)) then
             return oldNamecall(self, unpack(ModifyArgs({...})))
         end
         return oldNamecall(self, ...)
@@ -692,14 +678,11 @@ RunService.RenderStepped:Connect(function()
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     
     if Config.Flying and root and hum then
-        if not FlyLinearVelocity or FlyLinearVelocity.Parent ~= root or not FlyAlignOrientation or FlyAlignOrientation.Parent ~= root then
+        if not FlyBodyVelocity or FlyBodyVelocity.Parent ~= root or not FlyBodyGyro or FlyBodyGyro.Parent ~= root then
             StartFlight()
         end
         
         hum.PlatformStand = true
-        if hum:GetState() ~= Enum.HumanoidStateType.Physics then
-            hum:ChangeState(Enum.HumanoidStateType.Physics)
-        end
         
         local moveDir = Vector3.zero
         if UIS:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + Camera.CFrame.LookVector end
@@ -713,7 +696,7 @@ RunService.RenderStepped:Connect(function()
         local targetRotation = CFrame.new(root.Position, root.Position + Vector3.new(look.X, 0, look.Z))
         
         if moveDir.Magnitude > 0 then
-            FlyLinearVelocity.VectorVelocity = moveDir.Unit * Config.FlySpeed
+            FlyBodyVelocity.Velocity = moveDir.Unit * Config.FlySpeed
             if AnimationTrack then AnimationTrack:AdjustSpeed(1) end
             
             local horizontalMove = Vector3.new(moveDir.X, 0, moveDir.Z)
@@ -728,13 +711,13 @@ RunService.RenderStepped:Connect(function()
                 targetRotation = targetRotation * CFrame.Angles(tiltAngle, 0, rollAngle)
             end
         else
-            FlyLinearVelocity.VectorVelocity = Vector3.new(0, 0, 0)
+            FlyBodyVelocity.Velocity = Vector3.new(0, 0, 0)
             if AnimationTrack then AnimationTrack:AdjustSpeed(0) end
         end
         
-        FlyAlignOrientation.CFrame = FlyAlignOrientation.CFrame:Lerp(targetRotation, 0.25)
+        FlyBodyGyro.CFrame = targetRotation
     else
-        if FlyLinearVelocity or FlyAlignOrientation then
+        if FlyBodyVelocity or FlyBodyGyro then
             ClearFlight()
         end
     end
