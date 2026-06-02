@@ -43,12 +43,10 @@ local Config = {
 -- State
 local ESPObjects = {}
 local ToggleCallbacks = {}
-local Dragging = false
-local DragOffset = Vector2.zero
 local DroneNode = nil
 local SavedPosition = nil
 
--- UI
+-- UI Setup
 local Gui = Instance.new("ScreenGui")
 Gui.Name = "SlimHub"
 Gui.ResetOnSpawn = false
@@ -98,35 +96,29 @@ Title.TextColor3 = Color3.fromRGB(0, 255, 150)
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Parent = TopBar
 
--- Hardware-aligned Dragging Logic (Fixes mouse separation completely)
-local DragConnection
+-- ZERO INTERPOLATION DRAG (Forced Frame Lock)
+local Dragging = false
+local DragOffset = Vector2.zero
+
 TopBar.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         Dragging = true
         local mousePos = UIS:GetMouseLocation()
-        
-        -- Calculate exact offset relative to center anchor
         local frameCenter = MainFrame.AbsolutePosition + (MainFrame.AbsoluteSize * 0.5)
         DragOffset = mousePos - frameCenter
-        
-        if DragConnection then DragConnection:Disconnect() end
-        
-        DragConnection = UIS.InputChanged:Connect(function(changedInput)
-            if Dragging and (changedInput.UserInputType == Enum.UserInputType.MouseMovement or changedInput.UserInputType == Enum.UserInputType.Touch) then
-                local currentMouse = UIS:GetMouseLocation()
-                MainFrame.Position = UDim2.fromOffset(currentMouse.X - DragOffset.X, currentMouse.Y - DragOffset.Y)
-            end
-        end)
+    end
+end)
+
+UIS.InputChanged:Connect(function(input)
+    if Dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local currentMouse = UIS:GetMouseLocation()
+        MainFrame.Position = UDim2.fromOffset(currentMouse.X - DragOffset.X, currentMouse.Y - DragOffset.Y)
     end
 end)
 
 UIS.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         Dragging = false
-        if DragConnection then
-            DragConnection:Disconnect()
-            DragConnection = nil
-        end
     end
 end)
 
@@ -155,14 +147,14 @@ Sidebar.Parent = MainFrame
 local TabList = Instance.new("UIListLayout", Sidebar)
 TabList.Padding = UDim.new(0, 4)
 
--- Content
+-- Content Area
 local ContentArea = Instance.new("Frame")
 ContentArea.Size = UDim2.new(1, -145, 1, -65)
 ContentArea.Position = UDim2.fromOffset(140, 60)
 ContentArea.BackgroundTransparency = 1
 ContentArea.Parent = MainFrame
 
--- Tabs
+-- Tab Generator
 local Tabs = {}
 local function CreateTab(name)
     local Tab = Instance.new("ScrollingFrame")
@@ -243,7 +235,7 @@ CreateTabButton("ESP")
 CreateTabButton("Prison")
 CreateTabButton("Settings")
 
--- Components
+-- Section Framework
 local function CreateSection(parent, title)
     local Section = Instance.new("Frame")
     Section.Size = UDim2.new(1, -10, 0, 0)
@@ -531,7 +523,7 @@ local function CreateKeybindButton(parent, text, configKey, callback)
     end)
 end
 
--- Build Tabs
+-- Build Active Menus
 local MainSection = CreateSection(Tabs.Main, "Movement")
 CreateToggle(MainSection, "Fly", "Flying")
 CreateSlider(MainSection, "Fly Speed", "FlySpeed", 16, 250)
@@ -649,7 +641,7 @@ CreateKeybindButton(SettingsSection, "Fly Toggle", "FlyKeybind")
 CreateKeybindButton(SettingsSection, "Noclip Toggle", "NoclipKeybind")
 CreateKeybindButton(SettingsSection, "Speed Toggle", "SpeedKeybind")
 
--- ESP Drawing Setup
+-- ESP Allocation
 local function CreateESP(player)
     if ESPObjects[player] then return end
     
@@ -741,7 +733,7 @@ local function GetTarget()
     return closest
 end
 
--- Hook Prison Life Weapons
+-- Hook Engine Invocation Remotes
 for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
     if obj:IsA("RemoteEvent") then
         local name = obj.Name:lower()
@@ -771,9 +763,9 @@ for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
     end
 end
 
--- Global Engine Loops
+-- Core Engine Pipeline
 RunService.RenderStepped:Connect(function()
-    -- Fly
+    -- Fly execution
     if Config.Flying then
         local char = Player.Character
         if char then
@@ -796,7 +788,7 @@ RunService.RenderStepped:Connect(function()
         end
     end
     
-    -- Drone movement for invis
+    -- Invisibility drone tracking
     if Config.Invisible and DroneNode then
         local move = Vector3.zero
         if UIS:IsKeyDown(Enum.KeyCode.W) then move += Camera.CFrame.LookVector end
@@ -830,7 +822,7 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- Visuals Updates Loop
+-- Rendering Processing
 RunService.RenderStepped:Connect(function()
     local rainbowColor = Color3.fromHSV((tick() * 0.5) % 1, 1, 1)
     local espColor = Config.ESPRainbow and rainbowColor or Color3.fromRGB(0, 255, 150)
