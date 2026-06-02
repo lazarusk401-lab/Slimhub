@@ -51,12 +51,12 @@ local DroneNode = nil
 local SavedPosition = nil
 local IsTweeningMin = false
 
--- Liquid Trailing & Deformation State Variables
+-- Liquid State & Trail Settings
 local LastTrayPos = Vector2.new(0,0)
 local DragDistance = 0
-local BaseSize = 50
+local BaseSize = 52
 
--- Core GUI Container
+-- Core GUI Setup
 local Gui = Instance.new("ScreenGui")
 Gui.Name = "SlimHub"
 Gui.ResetOnSpawn = false
@@ -142,18 +142,15 @@ ContentArea.BackgroundTransparency = 1
 ContentArea.Parent = MainFrame
 
 -- ====================================================================
--- LIQUID TRAY CONTAINER W/ JIGGLE PHYSICS
+-- TRUE LIQUID TRAY FRAME (FIXED: Swapped out Button to kill clicks)
 -- ====================================================================
-local TrayBtn = Instance.new("TextButton")
+local TrayBtn = Instance.new("Frame")
+MainFrame.ClipsDescendants = true
 TrayBtn.Name = "SlimTray"
 TrayBtn.Size = UDim2.fromOffset(0, 0)
 TrayBtn.Position = MainFrame.Position
 TrayBtn.AnchorPoint = Vector2.new(0.5, 0.5)
 TrayBtn.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
-TrayBtn.Text = "S"
-TrayBtn.Font = Enum.Font.GothamBold
-TrayBtn.TextSize = 22
-TrayBtn.TextColor3 = Color3.fromRGB(0, 255, 150)
 TrayBtn.Visible = false
 TrayBtn.ZIndex = 10
 TrayBtn.Parent = Gui
@@ -165,28 +162,38 @@ local TrayStroke = Instance.new("UIStroke", TrayBtn)
 TrayStroke.Color = Color3.fromRGB(0, 255, 150)
 TrayStroke.Thickness = 2.5
 
--- Highly Fluid Droplet Trail Function
-local function SpawnLiquidTrail(position, velocity)
-    local sizeFactor = math.clamp(velocity * 1.2, 15, 45)
+local TrayLabel = Instance.new("TextLabel")
+TrayLabel.Size = UDim2.new(1, 0, 1, 0)
+TrayLabel.BackgroundTransparency = 1
+TrayLabel.Text = "S"
+TrayLabel.Font = Enum.Font.GothamBold
+TrayLabel.TextSize = 22
+TrayLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
+TrayLabel.ZIndex = 11
+TrayLabel.Parent = TrayBtn
+
+-- ULTRA LIQUID STREAMING SYSTEM (Metaball Accumulation Effect)
+local function SpawnLiquidTrail(position, velocity, currentSize)
+    -- Tail sizing drops based on frame's current squish state to seem connected
+    local targetRadius = math.clamp(currentSize.X * 0.75, 12, 38)
     
     local Node = Instance.new("Frame")
-    Node.Size = UDim2.fromOffset(sizeFactor, sizeFactor)
-    -- Add slight fluid variation offsets
-    local randomOffset = Vector2.new(math.random(-3, 3), math.random(-3, 3))
-    Node.Position = position + UDim2.fromOffset(randomOffset.X, randomOffset.Y)
+    Node.Size = UDim2.fromOffset(targetRadius, targetRadius)
+    Node.Position = position
     Node.AnchorPoint = Vector2.new(0.5, 0.5)
     Node.BackgroundColor3 = Color3.fromRGB(0, 255, 150)
-    Node.BackgroundTransparency = 0.4
+    -- Saturated transparency overlay mimics fluid density
+    Node.BackgroundTransparency = 0.35
     Node.BorderSizePixel = 0
     Node.ZIndex = 9
     Node.Parent = Gui
 
     Instance.new("UICorner", Node).CornerRadius = UDim.new(1, 0)
 
-    -- Rapid organic collapse animation
-    local Info = TweenInfo.new(0.25, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+    -- Near-instant melting decay profile
+    local Info = TweenInfo.new(0.18, Enum.EasingStyle.Circular, Enum.EasingDirection.In)
     local T = TweenService:Create(Node, Info, {
-        Size = UDim2.fromOffset(0, 0),
+        Size = UDim2.fromOffset(2, 2),
         BackgroundTransparency = 1
     })
     T:Play()
@@ -447,96 +454,15 @@ local function CreateSlider(parent, text, configKey, min, max, callback)
     end)
 end
 
-local function CreateKeybindButton(parent, text, configKey, callback)
-    local Row = Instance.new("Frame")
-    Row.Size = UDim2.new(1, 0, 0, 40)
-    Row.BackgroundTransparency = 1
-    Row.Parent = parent
-    
-    local Label = Instance.new("TextLabel")
-    Label.Size = UDim2.new(0.5, 0, 1, 0)
-    Label.BackgroundTransparency = 1
-    Label.Text = text
-    Label.Font = Enum.Font.Gotham
-    Label.TextSize = 13
-    Label.TextColor3 = Color3.fromRGB(220, 220, 230)
-    Label.TextXAlignment = Enum.TextXAlignment.Left
-    Label.Parent = Row
-    
-    local BindBtn = Instance.new("TextButton")
-    BindBtn.Size = UDim2.fromOffset(120, 28)
-    BindBtn.Position = UDim2.new(1, -120, 0.5, -14)
-    BindBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 36)
-    BindBtn.Text = Config[configKey] and Config[configKey].Name or "[NONE]"
-    BindBtn.Font = Enum.Font.Code
-    BindBtn.TextSize = 12
-    BindBtn.TextColor3 = Config[configKey] and Color3.fromRGB(0, 255, 150) or Color3.fromRGB(140, 140, 150)
-    BindBtn.Parent = Row
-    
-    Instance.new("UICorner", BindBtn).CornerRadius = UDim.new(0, 6)
-    local Stroke = Instance.new("UIStroke", BindBtn)
-    Stroke.Color = Color3.fromRGB(45, 45, 55)
-    Stroke.Thickness = 1
-    
-    local Listening = false
-    BindBtn.MouseButton1Click:Connect(function()
-        Listening = true
-        BindBtn.Text = "[PRESS KEY]"
-        BindBtn.TextColor3 = Color3.fromRGB(255, 150, 0)
-    end)
-    
-    UIS.InputBegan:Connect(function(input, gameProcessed)
-        if not Listening or gameProcessed then return end
-        if input.UserInputType == Enum.UserInputType.Keyboard then
-            Listening = false
-            if input.KeyCode == Enum.KeyCode.Escape then
-                Config[configKey] = nil
-                BindBtn.Text = "[NONE]"
-                BindBtn.TextColor3 = Color3.fromRGB(140, 140, 150)
-            else
-                Config[configKey] = input.KeyCode
-                BindBtn.Text = input.KeyCode.Name
-                BindBtn.TextColor3 = Color3.fromRGB(0, 255, 150)
-            end
-            if callback then callback(Config[configKey]) end
-        end
-    end)
-end
-
 -- Build Layout Structure
 local MainSection = CreateSection(Tabs.Main, "Movement")
 CreateToggle(MainSection, "Fly", "Flying")
 CreateSlider(MainSection, "Fly Speed", "FlySpeed", 16, 250)
-CreateToggle(MainSection, "Speed Hack", "SpeedHack", function(state)
-    local char = Player.Character
-    local hum = char and char:FindFirstChildOfClass("Humanoid")
-    if hum then hum.WalkSpeed = state and Config.HackSpeed or 16 end
-end)
-CreateSlider(MainSection, "Walk Speed", "HackSpeed", 16, 150, function(val)
-    if Config.SpeedHack then
-        local char = Player.Character
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
-        if hum then hum.WalkSpeed = val end
-    end
-end)
 CreateToggle(MainSection, "Noclip", "Noclip")
 CreateToggle(MainSection, "Infinite Jump", "InfiniteJump")
 
-local ESPSection = CreateSection(Tabs.ESP, "Visuals")
-CreateToggle(ESPSection, "ESP Enabled", "ESPEnabled")
-CreateToggle(ESPSection, "Show Tracers", "ESPTracers")
-CreateToggle(ESPSection, "Show Names", "ESPNames")
-CreateToggle(ESPSection, "Rainbow Mode", "ESPRainbow")
-
-local PrisonSection = CreateSection(Tabs.Prison, "Combat")
-CreateToggle(PrisonSection, "Silent Aim", "SilentAim")
-CreateSlider(PrisonSection, "FOV Size", "SilentAimFOV", 50, 400)
-
-local SettingsSection = CreateSection(Tabs.Settings, "Keybinds")
-CreateKeybindButton(SettingsSection, "Menu Toggle", "MenuKeybind")
-
 -- ====================================================================
--- SAFE TOGGLE INTERFACE TRANSITION MANAGER
+-- SEAMLESS TRANSITION ENGINE
 -- ====================================================================
 local function ToggleMinimize()
     if IsTweeningMin then return end
@@ -545,10 +471,9 @@ local function ToggleMinimize()
     Config.IsMinimized = not Config.IsMinimized
     
     local SpeedInfo = TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-    local FadeInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    local FadeInfo = TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
     
     if Config.IsMinimized then
-        MainFrame.ClipsDescendants = true
         local HideMain = TweenService:Create(MainFrame, FadeInfo, {Size = UDim2.fromOffset(0, 0)})
         HideMain:Play()
         
@@ -587,15 +512,8 @@ end
 
 MinBtn.MouseButton1Click:Connect(ToggleMinimize)
 
--- Failsafe Click-vs-Drag verification check
-TrayBtn.MouseButton1Click:Connect(function()
-    if DragDistance < 8 then
-        ToggleMinimize()
-    end
-end)
-
 -- ====================================================================
--- REBUILT COMPONENT DRAG CONTROLLERS (ZERO-DRIFT)
+-- DRAG ENGINE & EXCLUSIVE ACCURATE CLICK PARSER
 -- ====================================================================
 TopBar.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -610,7 +528,7 @@ TrayBtn.InputBegan:Connect(function(input)
         TrayDragging = true
         DragStart = input.Position
         StartPos = TrayBtn.Position
-        DragDistance = 0 -- Clear distance calculation tracker on press
+        DragDistance = 0 -- Clear tracking values
     end
 end)
 
@@ -629,8 +547,19 @@ end)
 
 UIS.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        if TrayDragging then
+            TrayDragging = false
+            -- STRICT DISCRIMINATION: Only expand if the user performed a clean, isolated tap click
+            if DragDistance < 6 then
+                ToggleMinimize()
+            else
+                -- Snap back to liquid rest shape cleanly
+                TweenService:Create(TrayBtn, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+                    Size = UDim2.fromOffset(BaseSize, BaseSize)
+                }):Play()
+            end
+        end
         MainDragging = false
-        TrayDragging = false
     end
 end)
 
@@ -648,40 +577,39 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
 end)
 
 -- ====================================================================
--- PHYSICS ENGINE LOGIC (LIQUID DEFORMATION & FLUID TRAIL)
+-- REALTIME LIQUEFY PHYSICS PROCESSING LOOP
 -- ====================================================================
 RunService.RenderStepped:Connect(function()
     if Config.IsMinimized and TrayBtn.Visible then
-        local currentCenter = Vector2.new(TrayBtn.AbsolutePosition.X + (BaseSize/2), TrayBtn.AbsolutePosition.Y + (BaseSize/2))
+        local currentCenter = Vector2.new(TrayBtn.AbsolutePosition.X + (TrayBtn.AbsoluteSize.X/2), TrayBtn.AbsolutePosition.Y + (TrayBtn.AbsoluteSize.Y/2))
         local rawVelocity = currentCenter - LastTrayPos
         local speed = rawVelocity.Magnitude
         
-        if speed > 0.5 then
-            -- 1. Liquid Node Streaming Engine
-            if speed > 2 then
-                SpawnLiquidTrail(UDim2.fromOffset(currentCenter.X, currentCenter.Y), speed)
+        if speed > 0.1 then
+            -- 1. Overlapping Streamline Liquid Particle Generator
+            if speed > 1.5 then
+                SpawnLiquidTrail(UDim2.fromOffset(currentCenter.X, currentCenter.Y), speed, TrayBtn.AbsoluteSize)
             end
             
-            -- 2. Real-Time Dynamic Liquefying Deformation Math
-            local stretchFactor = math.clamp(1 + (speed / 90), 1, 1.45)
-            local squeezeFactor = math.clamp(1 - (speed / 130), 0.65, 1)
+            -- 2. Organic Vector Elastic Deformation Physics
+            local stretchFactor = math.clamp(1 + (speed / 35), 1, 1.5)
+            local squeezeFactor = math.clamp(1 - (speed / 55), 0.5, 1)
             
-            -- Match deformation vectors to movement plane coordinates
             if math.abs(rawVelocity.X) > math.abs(rawVelocity.Y) then
                 TrayBtn.Size = UDim2.fromOffset(BaseSize * stretchFactor, BaseSize * squeezeFactor)
             else
                 TrayBtn.Size = UDim2.fromOffset(BaseSize * squeezeFactor, BaseSize * stretchFactor)
             end
         else
-            -- Soft elastic rebound return to target size when dragging halts
-            TweenService:Create(TrayBtn, TweenInfo.new(0.15, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-                Size = UDim2.fromOffset(BaseSize, BaseSize)
-            }):Play()
+            -- Smooth, continuous snap structural normalization
+            if not TrayDragging then
+                TrayBtn.Size = TrayBtn.Size:Lerp(UDim2.fromOffset(BaseSize, BaseSize), 0.2)
+            end
         end
         LastTrayPos = currentCenter
     end
 
-    -- Flight control calculations
+    -- Flight Control Logic
     if Config.Flying and Player.Character then
         local root = Player.Character:FindFirstChild("HumanoidRootPart")
         if root then
