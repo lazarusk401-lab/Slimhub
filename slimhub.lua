@@ -82,7 +82,7 @@ local ContentArea = Instance.new("Frame", MainFrame)
 ContentArea.Size = UDim2.new(1, -145, 1, -65); ContentArea.Position = UDim2.fromOffset(140, 60)
 ContentArea.BackgroundTransparency = 1
 
--- Minimized Icon (The 'S' Circle)
+-- Minimized Icon
 local MinimizedIcon = Instance.new("TextButton", Gui)
 MinimizedIcon.Name = "MinimizedIcon"
 MinimizedIcon.Size = UDim2.fromOffset(45, 45)
@@ -130,7 +130,7 @@ local function MaximizeMenu()
     })
     iconTween:Play()
     iconTween.Completed:Connect(function()
-        MinimizedIcon.Visible = false -- FIX: Completely hide it
+        MinimizedIcon.Visible = false
     end)
     
     MainFrame.Visible = true
@@ -393,7 +393,7 @@ local function CreateESP(player)
     if ESPObjects[player] then return end
     local box = Drawing.new("Square"); box.Thickness = 1; box.Color = Color3.fromRGB(0, 255, 150); box.Filled = false; box.Visible = false
     local name = Drawing.new("Text"); name.Size = 13; name.Center = true; name.Outline = true; name.Color = Color3.fromRGB(255, 255, 255); name.Visible = false
-    local tracer = Drawing.new("Line"); tracer.Thickness = 1; tracer.Color = Color3.fromRGB(0, 255, 150); tracer.Visible = false
+    local tracer = Drawing.new("Line"); tracer.Thickness = 0.8; tracer.Color = Color3.fromRGB(0, 255, 150); tracer.Visible = false
     ESPObjects[player] = {Box = box, Name = name, Tracer = tracer}
 end
 
@@ -426,26 +426,30 @@ for _, p in ipairs(Players:GetPlayers()) do if p ~= Player then CreateESP(p) end
 local FOVCircle = Drawing.new("Circle"); FOVCircle.Visible = false; FOVCircle.Thickness = 1.5
 FOVCircle.Color = Color3.fromRGB(0, 255, 150); FOVCircle.Filled = false; FOVCircle.NumSides = 64
 
+-- HYPER-ACCURATE SILENT AIM WITH WALLBANG
 local function GetTarget()
-    local mousePos = UIS:GetMouseLocation(); local closest = nil; local closestDist = Config.SilentAimFOV
+    local mousePos = UIS:GetMouseLocation()
+    local closest = nil
+    local closestDist = Config.SilentAimFOV
+    
     for _, targetPlayer in ipairs(Players:GetPlayers()) do
         if targetPlayer ~= Player and targetPlayer.Character then
             if Config.SilentAimTeamCheck and targetPlayer.Team == Player.Team then continue end
-            local targetPart = targetPlayer.Character:FindFirstChild(Config.SilentAimHitbox) or targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+            
+            local targetPart = targetPlayer.Character:FindFirstChild(Config.SilentAimHitbox) 
+                or targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+            
             if targetPart then
                 local humanoid = targetPlayer.Character:FindFirstChildOfClass("Humanoid")
                 if humanoid and humanoid.Health > 0 then
                     local screenPos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
                     if onScreen then
                         local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                        
+                        -- WALLBANG: Always allow through walls (removed the raycast check entirely)
                         if dist < closestDist then
-                            if Config.SilentAimWallCheck then
-                                local params = RaycastParams.new()
-                                params.FilterDescendantsInstances = {Player.Character, targetPlayer.Character}
-                                params.FilterType = Enum.RaycastFilterType.Exclude
-                                if workspace:Raycast(Camera.CFrame.Position, (targetPart.Position - Camera.CFrame.Position).Unit * 1000, params) then continue end
-                            end
-                            closestDist = dist; closest = targetPart
+                            closestDist = dist
+                            closest = targetPart
                         end
                     end
                 end
@@ -474,24 +478,38 @@ end)
 local function ModifyArgs(args)
     local target = GetTarget()
     if not target then return args end
-    local camPos = Camera.CFrame.Position; local targetPos = target.Position
+    
+    local camPos = Camera.CFrame.Position
+    local targetPos = target.Position
+    
+    -- HYPER-ACCURACY: Direct hit with no smoothing unless configured
     if Config.SilentAimSmoothness > 0 then
         targetPos = camPos + (Camera.CFrame.LookVector:Lerp((targetPos - camPos).Unit, Config.SilentAimSmoothness / 100) * 1000)
     end
+    
     local newArgs = {unpack(args)}
     if #newArgs >= 1 and type(newArgs[1]) == "table" then
         local firstArg = newArgs[1]
         if #firstArg > 0 and type(firstArg[1]) == "table" and firstArg[1].Hit ~= nil then
+            -- Replace ALL hits with the target (guaranteed hit)
             for i = 1, #firstArg do
-                firstArg[i].Hit = target; firstArg[i].Distance = (camPos - targetPos).Magnitude; firstArg[i].Cframe = CFrame.new(camPos, targetPos)
+                firstArg[i].Hit = target
+                firstArg[i].Distance = (camPos - targetPos).Magnitude
+                firstArg[i].Cframe = CFrame.new(camPos, targetPos)
             end
         elseif firstArg.Hit ~= nil then
-            firstArg.Hit = target; firstArg.Distance = (camPos - targetPos).Magnitude; firstArg.Cframe = CFrame.new(camPos, targetPos)
+            firstArg.Hit = target
+            firstArg.Distance = (camPos - targetPos).Magnitude
+            firstArg.Cframe = CFrame.new(camPos, targetPos)
         else
             newArgs[1] = {{Hit = target, Distance = (camPos - targetPos).Magnitude, Cframe = CFrame.new(camPos, targetPos)}}
         end
-    elseif #newArgs >= 2 then newArgs[2] = targetPos
-    elseif #newArgs >= 1 then newArgs[2] = targetPos end
+    elseif #newArgs >= 2 then
+        newArgs[2] = targetPos
+    elseif #newArgs >= 1 then
+        newArgs[2] = targetPos
+    end
+    
     return newArgs
 end
 
@@ -522,11 +540,11 @@ RunService.RenderStepped:Connect(function()
         if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then moveDir -= Vector3.yAxis end
         
         local targetVelocity = moveDir.Magnitude > 0 and moveDir.Unit * Config.FlySpeed or Vector3.zero
-        local accel = moveDir.Magnitude > 0 and 2 or 4 -- Smoothness factors
+        local accel = moveDir.Magnitude > 0 and 2 or 4
         CurrentFlyVelocity = CurrentFlyVelocity:Lerp(targetVelocity, accel * 0.05)
         root.AssemblyLinearVelocity = CurrentFlyVelocity
         
-        -- Camera Banking (Roll) for cool flight feel
+        -- Camera Banking
         local targetRoll = 0
         if UIS:IsKeyDown(Enum.KeyCode.A) then targetRoll = 12 end
         if UIS:IsKeyDown(Enum.KeyCode.D) then targetRoll = -12 end
@@ -572,15 +590,20 @@ RunService.RenderStepped:Connect(function()
             local humanoid = p.Character:FindFirstChildOfClass("Humanoid")
             if root and humanoid and humanoid.Health > 0 then
                 local pos, onScreen = Camera:WorldToViewportPoint(root.Position)
-                if Config.ESPTracers and Player.Character then
+                
+                -- CLEAN TRACERS: Only draw when player is actually visible on screen
+                if Config.ESPTracers and onScreen and Player.Character then
                     local localRoot = Player.Character:FindFirstChild("HumanoidRootPart")
                     if localRoot then
                         local myPos = Camera:WorldToViewportPoint(localRoot.Position)
                         drawings.Tracer.From = Vector2.new(myPos.X, myPos.Y)
-                        drawings.Tracer.To = Vector2.new(math.clamp(pos.X, 0, viewportSize.X), math.clamp(pos.Y, 0, viewportSize.Y))
-                        drawings.Tracer.Color = espColor; drawings.Tracer.Visible = true
+                        drawings.Tracer.To = Vector2.new(pos.X, pos.Y)
+                        drawings.Tracer.Color = espColor
+                        drawings.Tracer.Visible = true
                     end
-                else drawings.Tracer.Visible = false end
+                else
+                    drawings.Tracer.Visible = false
+                end
 
                 if onScreen then
                     local sizeY = math.abs(Camera:WorldToViewportPoint(root.Position + Vector3.new(0, 3, 0)).Y - Camera:WorldToViewportPoint(root.Position - Vector3.new(0, 3, 0)).Y)
@@ -589,8 +612,19 @@ RunService.RenderStepped:Connect(function()
                     drawings.Box.Color = espColor; drawings.Box.Visible = true
                     drawings.Name.Text = p.Name; drawings.Name.Position = Vector2.new(pos.X, pos.Y - sizeY/2 - 15)
                     drawings.Name.Color = espColor; drawings.Name.Visible = Config.ESPNames
-                else drawings.Box.Visible = false; drawings.Name.Visible = false end
-            else drawings.Box.Visible = false; drawings.Name.Visible = false; drawings.Tracer.Visible = false end
-        else drawings.Box.Visible = false; drawings.Name.Visible = false; drawings.Tracer.Visible = false end
+                else
+                    drawings.Box.Visible = false
+                    drawings.Name.Visible = false
+                end
+            else
+                drawings.Box.Visible = false
+                drawings.Name.Visible = false
+                drawings.Tracer.Visible = false
+            end
+        else
+            drawings.Box.Visible = false
+            drawings.Name.Visible = false
+            drawings.Tracer.Visible = false
+        end
     end
 end)
