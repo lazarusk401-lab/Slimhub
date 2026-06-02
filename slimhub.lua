@@ -26,6 +26,9 @@ local MenuPositionBeforeMinimize = UDim2.new(0.5, 0, 0.5, 0)
 local ShootRemotes = {}
 
 local AnimationTrack = nil
+local FlyVelocity = nil
+local FlyGyro = nil
+local FlyAttachment = nil
 
 local Gui = Instance.new("ScreenGui")
 Gui.Name = "SlimHub"
@@ -280,8 +283,13 @@ local function CreateToggle(parent, text, configKey, callback)
     
     local function Update(state)
         Config[configKey] = state
-        TweenService:Create(ToggleBtn, TweenInfo.new(0.2), {BackgroundColor3 = state and Color3.fromRGB(0, 255, 150) or Color3.fromRGB(35, 35, 45)}):Play()
-        TweenService:Create(Knob, TweenInfo.new(0.2), {Position = state and UDim2.new(1, -21, 0.5, -9) or UDim2.new(0, 3, 0.5, -9)}):Play()
+        -- Added smooth tween animations for toggle operations
+        TweenService:Create(ToggleBtn, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+            BackgroundColor3 = state and Color3.fromRGB(0, 255, 150) or Color3.fromRGB(35, 35, 45)
+        }):Play()
+        TweenService:Create(Knob, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+            Position = state and UDim2.new(1, -21, 0.5, -9) or UDim2.new(0, 3, 0.5, -9)
+        }):Play()
         if callback then callback(state) end
     end
     ToggleBtn.MouseButton1Click:Connect(function() Update(not Config[configKey]) end)
@@ -333,14 +341,22 @@ local function CreateSlider(parent, text, configKey, min, max, callback)
     Instance.new("UICorner", Knob).CornerRadius = UDim.new(1, 0)
 
     local Holding = false
-    local function Update(input)
+    local function Update(input, isDragging)
         local pos = math.clamp((input.Position.X - Track.AbsolutePosition.X) / Track.AbsoluteSize.X, 0, 1)
-        Fill.Size = UDim2.new(pos, 0, 1, 0); Knob.Position = UDim2.new(pos, -7, 0.5, -7)
         local val = math.floor(min + (pos * (max - min))); Config[configKey] = val
-        ValueLabel.Text = tostring(val); if callback then callback(val) end
+        ValueLabel.Text = tostring(val)
+        
+        -- Added smooth tween transitions for slider position changes
+        local tweenTime = isDragging and 0.05 or 0.25
+        local tInfo = TweenInfo.new(tweenTime, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+        
+        TweenService:Create(Fill, tInfo, {Size = UDim2.new(pos, 0, 1, 0)}):Play()
+        TweenService:Create(Knob, tInfo, {Position = UDim2.new(pos, -7, 0.5, -7)}):Play()
+        
+        if callback then callback(val) end
     end
-    HitArea.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then Holding = true; Update(input) end end)
-    UIS.InputChanged:Connect(function(input) if Holding and input.UserInputType == Enum.UserInputType.MouseMovement then Update(input) end end)
+    HitArea.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then Holding = true; Update(input, false) end end)
+    UIS.InputChanged:Connect(function(input) if Holding and input.UserInputType == Enum.UserInputType.MouseMovement then Update(input, true) end end)
     UIS.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 and Holding then Holding = false end end)
 end
 
@@ -388,6 +404,12 @@ local MainSection = CreateSection(Tabs.Main, "Movement")
 
 local function ClearFlight()
     if AnimationTrack then AnimationTrack:Stop(); AnimationTrack:Destroy(); AnimationTrack = nil end
+    
+    -- Cleanup physical constraints safely
+    if FlyVelocity then FlyVelocity:Destroy(); FlyVelocity = nil end
+    if FlyGyro then FlyGyro:Destroy(); FlyGyro = nil end
+    if FlyAttachment then FlyAttachment:Destroy(); FlyAttachment = nil end
+    
     local char = Player.Character
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     if hum then 
@@ -398,8 +420,24 @@ end
 local function StartFlight()
     ClearFlight()
     local char = Player.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
     local hum = char and char:FindFirstChildOfClass("Humanoid")
-    if not hum then return end
+    if not root or not hum then return end
+    
+    -- Set up precise physical constraints for completely smooth physics replication
+    FlyAttachment = Instance.new("Attachment", root)
+    FlyAttachment.Name = "FlyAttachment"
+    
+    FlyVelocity = Instance.new("LinearVelocity", root)
+    FlyVelocity.Attachment0 = FlyAttachment
+    FlyVelocity.MaxForce = math.huge
+    FlyVelocity.VectorVelocity = Vector3.zero
+    
+    FlyGyro = Instance.new("AlignOrientation", root)
+    FlyGyro.Attachment0 = FlyAttachment
+    FlyGyro.MaxTorque = math.huge
+    FlyGyro.Responsiveness = 25
+    FlyGyro.CFrame = root.CFrame
     
     local animProvider = hum:FindFirstChildOfClass("Animator") or Instance.new("Animator", hum)
     local flyAnim = Instance.new("Animation")
@@ -658,7 +696,8 @@ RunService.RenderStepped:Connect(function(deltaTime)
     local root = char and char:FindFirstChild("HumanoidRootPart")
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     
-    if Config.Flying and root and hum then
+    -- Smooth Physics Flying Interpolation Block
+    if Config.Flying and root and hum and FlyVelocity and FlyGyro then
         hum.PlatformStand = true
         
         local moveDir = Vector3.zero
@@ -670,11 +709,10 @@ RunService.RenderStepped:Connect(function(deltaTime)
         if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then moveDir = moveDir - Vector3.new(0, 1, 0) end
         
         local look = Camera.CFrame.LookVector
-        local targetCFrame = CFrame.new(root.Position, root.Position + Vector3.new(look.X, 0, look.Z))
         
         if moveDir.Magnitude > 0 then
             if AnimationTrack then AnimationTrack:AdjustSpeed(1) end
-            local newPosition = root.Position + (moveDir.Unit * Config.FlySpeed * deltaTime)
+            FlyVelocity.VectorVelocity = moveDir.Unit * Config.FlySpeed
             
             local horizontalMove = Vector3.new(moveDir.X, 0, moveDir.Z)
             if horizontalMove.Magnitude > 0 then
@@ -685,16 +723,15 @@ RunService.RenderStepped:Connect(function(deltaTime)
                 
                 local tiltAngle = math.rad(-20) * math.clamp(dot, -1, 1)
                 local rollAngle = math.rad(-20) * math.clamp(rightDot, -1, 1)
-                targetCFrame = CFrame.new(newPosition, newPosition + Vector3.new(look.X, 0, look.Z)) * CFrame.Angles(tiltAngle, 0, rollAngle)
+                FlyGyro.CFrame = CFrame.new(root.Position, root.Position + Vector3.new(look.X, 0, look.Z)) * CFrame.Angles(tiltAngle, 0, rollAngle)
             else
-                targetCFrame = CFrame.new(newPosition, newPosition + Vector3.new(look.X, 0, look.Z))
+                FlyGyro.CFrame = CFrame.new(root.Position, root.Position + Vector3.new(look.X, 0, look.Z))
             end
         else
             if AnimationTrack then AnimationTrack:AdjustSpeed(0) end
-            targetCFrame = CFrame.new(root.Position, root.Position + Vector3.new(look.X, 0, look.Z))
+            FlyVelocity.VectorVelocity = Vector3.zero
+            FlyGyro.CFrame = CFrame.new(root.Position, root.Position + Vector3.new(look.X, 0, look.Z))
         end
-        
-        root.CFrame = targetCFrame
     end
     
     if Config.Invisible and DronePosition and root then
@@ -710,7 +747,6 @@ RunService.RenderStepped:Connect(function(deltaTime)
         root.CFrame = CFrame.new(DronePosition.X, DronePosition.Y - 100, DronePosition.Z)
     end
 
-    -- FOV Rendering Logic
     if Config.SilentAim then
         local mousePos = UIS:GetMouseLocation()
         FOVCircle.Position = mousePos
@@ -720,7 +756,6 @@ RunService.RenderStepped:Connect(function(deltaTime)
         FOVCircle.Visible = false
     end
 
-    -- ESP Rendering Loop
     local tickValue = tick()
     local rainbowColor = Color3.fromHSV((tickValue % 5) / 5, 1, 1)
     
@@ -738,8 +773,6 @@ RunService.RenderStepped:Connect(function(deltaTime)
             
             if onScreen then
                 local currentC = Config.ESPRainbow and rainbowColor or Color3.fromRGB(0, 255, 150)
-                
-                -- Calculations for bounding screen dimensions based on distance
                 local factor = 1 / (pos.Z * math.tan(math.rad(Camera.FieldOfView / 2))) * 1000
                 local w, h = 4 * factor, 6 * factor
                 
@@ -765,19 +798,14 @@ RunService.RenderStepped:Connect(function(deltaTime)
                     tracer.Visible = false
                 end
             else
-                box.Visible = false
-                name.Visible = false
-                tracer.Visible = false
+                box.Visible = false; name.Visible = false; tracer.Visible = false
             end
         else
-            box.Visible = false
-            name.Visible = false
-            tracer.Visible = false
+            box.Visible = false; name.Visible = false; tracer.Visible = false
         end
     end
 end)
 
--- Noclip Collisions Loop
 RunService.Stepped:Connect(function()
     if Config.Noclip then
         local char = Player.Character
