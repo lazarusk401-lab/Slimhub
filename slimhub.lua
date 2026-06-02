@@ -122,25 +122,34 @@ UIS.InputEnded:Connect(function(input)
     end
 end)
 
--- Sidebar
+-- Contain Area for Sidebar and Content to properly clip during structural scale changes
+local WindowContainer = Instance.new("Frame")
+WindowContainer.Name = "WindowContainer"
+WindowContainer.Size = UDim2.new(1, 0, 1, -50)
+WindowContainer.Position = UDim2.fromOffset(0, 50)
+WindowContainer.BackgroundTransparency = 1
+WindowContainer.ClipsDescendants = true
+WindowContainer.Parent = MainFrame
+
+-- Sidebar (Parented inside Container)
 local Sidebar = Instance.new("Frame")
-Sidebar.Size = UDim2.new(0, 130, 1, -50)
-Sidebar.Position = UDim2.fromOffset(0, 50)
+Sidebar.Size = UDim2.new(0, 130, 1, 0)
+Sidebar.Position = UDim2.fromOffset(0, 0)
 Sidebar.BackgroundColor3 = Color3.fromRGB(15, 15, 19)
 Sidebar.BorderSizePixel = 0
-Sidebar.Parent = MainFrame
+Sidebar.Parent = WindowContainer
 
 local TabList = Instance.new("UIListLayout", Sidebar)
 TabList.Padding = UDim.new(0, 4)
 
--- Content Area
+-- Content Area (Parented inside Container)
 local ContentArea = Instance.new("Frame")
-ContentArea.Size = UDim2.new(1, -145, 1, -65)
-ContentArea.Position = UDim2.fromOffset(140, 60)
+ContentArea.Size = UDim2.new(1, -145, 1, -15)
+ContentArea.Position = UDim2.fromOffset(140, 10)
 ContentArea.BackgroundTransparency = 1
-ContentArea.Parent = MainFrame
+ContentArea.Parent = WindowContainer
 
--- Minimize Button Functionality
+-- Minimize Button Functionality (Toggles Container sizing & Window visibility state flawlessly)
 local MinBtn = Instance.new("TextButton")
 MinBtn.Name = "MinBtn"
 MinBtn.Size = UDim2.fromOffset(30, 30)
@@ -157,14 +166,12 @@ Instance.new("UICorner", MinBtn).CornerRadius = UDim.new(0, 8)
 MinBtn.MouseButton1Click:Connect(function()
     Config.IsMinimized = not Config.IsMinimized
     if Config.IsMinimized then
-        Sidebar.Visible = false
-        ContentArea.Visible = false
+        WindowContainer.Visible = false
         MainFrame.Size = UDim2.fromOffset(500, 50)
         MinBtn.Text = "+"
     else
         MainFrame.Size = UDim2.fromOffset(500, 380)
-        Sidebar.Visible = true
-        ContentArea.Visible = true
+        WindowContainer.Visible = true
         MinBtn.Text = "-"
     end
 end)
