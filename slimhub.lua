@@ -25,7 +25,6 @@ local SavedPosition = nil
 local MenuPositionBeforeMinimize = UDim2.new(0.5, 0, 0.5, 0)
 local ShootRemotes = {}
 
--- Modern Physics Instances
 local FlyAttachment = nil
 local FlyLinearVelocity = nil
 local FlyAlignOrientation = nil
@@ -411,27 +410,24 @@ local function StartFlight()
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     if not root or not hum then return end
     
-    -- Network authority trick: Set PlatformStand true to completely stop native physics engine overrides
     hum.PlatformStand = true
     
     FlyAttachment = Instance.new("Attachment")
     FlyAttachment.Name = "SlimFlyAttachment"
     FlyAttachment.Parent = root
     
-    -- Setup Modern Linear Velocity Constraint
     FlyLinearVelocity = Instance.new("LinearVelocity")
     FlyLinearVelocity.Name = "SlimFlyVelocity"
     FlyLinearVelocity.Attachment0 = FlyAttachment
-    FlyLinearVelocity.MaxForce = math.huge
+    FlyLinearVelocity.MaxForce = 56000 -- Adjusted from math.huge to allow local force replication updates
     FlyLinearVelocity.VelocityConstraintMode = Enum.VelocityConstraintMode.Vector
     FlyLinearVelocity.VectorVelocity = Vector3.zero
     FlyLinearVelocity.Parent = root
     
-    -- Setup Modern Align Orientation Constraint
     FlyAlignOrientation = Instance.new("AlignOrientation")
     FlyAlignOrientation.Name = "SlimFlyOrientation"
     FlyAlignOrientation.Attachment0 = FlyAttachment
-    FlyAlignOrientation.MaxTorque = math.huge
+    FlyAlignOrientation.MaxTorque = 56000
     FlyAlignOrientation.Responsiveness = 25
     FlyAlignOrientation.Mode = Enum.OrientationControlMode.OneAttachment
     FlyAlignOrientation.CFrame = Camera.CFrame
@@ -699,16 +695,15 @@ RunService.RenderStepped:Connect(function()
             StartFlight()
         end
         
-        -- Lock physics state
         hum.PlatformStand = true
         
         local moveDir = Vector3.zero
-        if UIS:IsKeyDown(Enum.KeyCode.W) then moveDir += Camera.CFrame.LookVector end
-        if UIS:IsKeyDown(Enum.KeyCode.S) then moveDir -= Camera.CFrame.LookVector end
-        if UIS:IsKeyDown(Enum.KeyCode.A) then moveDir -= Camera.CFrame.RightVector end
-        if UIS:IsKeyDown(Enum.KeyCode.D) then moveDir += Camera.CFrame.RightVector end
-        if UIS:IsKeyDown(Enum.KeyCode.Space) then moveDir += Vector3.yAxis end
-        if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then moveDir -= Vector3.yAxis end
+        if UIS:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + Camera.CFrame.LookVector end
+        if UIS:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - Camera.CFrame.LookVector end
+        if UIS:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - Camera.CFrame.RightVector end
+        if UIS:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + Camera.CFrame.RightVector end
+        if UIS:IsKeyDown(Enum.KeyCode.Space) then moveDir = moveDir + Vector3.new(0, 1, 0) end
+        if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then moveDir = moveDir - Vector3.new(0, 1, 0) end
         
         local look = Camera.CFrame.LookVector
         local targetRotation = CFrame.new(root.Position, root.Position + Vector3.new(look.X, 0, look.Z))
@@ -717,7 +712,6 @@ RunService.RenderStepped:Connect(function()
             FlyLinearVelocity.VectorVelocity = moveDir.Unit * Config.FlySpeed
             if AnimationTrack then AnimationTrack:AdjustSpeed(1) end
             
-            -- Smooth Dynamic leaning logic
             local horizontalMove = Vector3.new(moveDir.X, 0, moveDir.Z)
             if horizontalMove.Magnitude > 0 then
                 local forwardSpace = root.CFrame:VectorToWorldSpace(Vector3.new(0, 0, -1))
@@ -730,12 +724,11 @@ RunService.RenderStepped:Connect(function()
                 targetRotation = targetRotation * CFrame.Angles(tiltAngle, 0, rollAngle)
             end
         else
-            -- Kill drifting instantly
-            FlyLinearVelocity.VectorVelocity = Vector3.zero
+            -- Continuous safe counter-force velocity assignment instead of hard vector zeroing out
+            FlyLinearVelocity.VectorVelocity = Vector3.new(0, 0, 0)
             if AnimationTrack then AnimationTrack:AdjustSpeed(0) end
         end
         
-        -- Smoothly interpolate orientation to prevent hard snaps
         FlyAlignOrientation.CFrame = FlyAlignOrientation.CFrame:Lerp(targetRotation, 0.25)
     else
         if FlyLinearVelocity or FlyAlignOrientation then
@@ -745,13 +738,13 @@ RunService.RenderStepped:Connect(function()
     
     if Config.Invisible and DronePosition and root then
         local moveDir = Vector3.zero
-        if UIS:IsKeyDown(Enum.KeyCode.W) then moveDir += Camera.CFrame.LookVector end
-        if UIS:IsKeyDown(Enum.KeyCode.S) then moveDir -= Camera.CFrame.LookVector end
-        if UIS:IsKeyDown(Enum.KeyCode.A) then moveDir -= Camera.CFrame.RightVector end
-        if UIS:IsKeyDown(Enum.KeyCode.D) then moveDir += Camera.CFrame.RightVector end
+        if UIS:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + Camera.CFrame.LookVector end
+        if UIS:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - Camera.CFrame.LookVector end
+        if UIS:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - Camera.CFrame.RightVector end
+        if UIS:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + Camera.CFrame.RightVector end
         local speed = Config.SpeedHack and Config.HackSpeed or Config.DroneSpeed
         if moveDir.Magnitude > 0 then
-            DronePosition += Vector3.new(moveDir.X, 0, moveDir.Z).Unit * speed * 0.016
+            DronePosition = DronePosition + Vector3.new(moveDir.X, 0, moveDir.Z).Unit * speed * 0.016
         end
         root.CFrame = CFrame.new(DronePosition.X, DronePosition.Y - 100, DronePosition.Z)
     end
