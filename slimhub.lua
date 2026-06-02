@@ -140,6 +140,34 @@ ContentArea.Position = UDim2.fromOffset(140, 60)
 ContentArea.BackgroundTransparency = 1
 ContentArea.Parent = MainFrame
 
+-- Minimized Icon (Bottom Right Circle with 'S')
+local MinimizedIcon = Instance.new("TextButton")
+MinimizedIcon.Name = "MinimizedIcon"
+MinimizedIcon.Size = UDim2.fromOffset(45, 45)
+MinimizedIcon.Position = UDim2.new(1, -60, 1, -60) -- Bottom right corner with padding
+MinimizedIcon.BackgroundColor3 = Color3.fromRGB(13, 13, 17)
+MinimizedIcon.Text = "S"
+MinimizedIcon.Font = Enum.Font.GothamBold
+MinimizedIcon.TextSize = 22
+MinimizedIcon.TextColor3 = Color3.fromRGB(0, 255, 150)
+MinimizedIcon.Visible = false
+MinimizedIcon.Parent = Gui
+
+Instance.new("UICorner", MinimizedIcon).CornerRadius = UDim.new(1, 0) -- Perfect circle
+
+local IconStroke = Instance.new("UIStroke", MinimizedIcon)
+IconStroke.Color = Color3.fromRGB(40, 40, 50)
+IconStroke.Thickness = 1.5
+
+-- Hover effects for the minimized icon
+MinimizedIcon.MouseEnter:Connect(function()
+    TweenService:Create(MinimizedIcon, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(20, 20, 26)}):Play()
+end)
+
+MinimizedIcon.MouseLeave:Connect(function()
+    TweenService:Create(MinimizedIcon, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(13, 13, 17)}):Play()
+end)
+
 -- Minimize Button Functionality
 local MinBtn = Instance.new("TextButton")
 MinBtn.Name = "MinBtn"
@@ -155,18 +183,15 @@ MinBtn.Parent = TopBar
 Instance.new("UICorner", MinBtn).CornerRadius = UDim.new(0, 8)
 
 MinBtn.MouseButton1Click:Connect(function()
-    Config.IsMinimized = not Config.IsMinimized
-    if Config.IsMinimized then
-        Sidebar.Visible = false
-        ContentArea.Visible = false
-        MainFrame.Size = UDim2.fromOffset(500, 50)
-        MinBtn.Text = "+"
-    else
-        MainFrame.Size = UDim2.fromOffset(500, 380)
-        Sidebar.Visible = true
-        ContentArea.Visible = true
-        MinBtn.Text = "-"
-    end
+    Config.IsMinimized = true
+    MainFrame.Visible = false
+    MinimizedIcon.Visible = true
+end)
+
+MinimizedIcon.MouseButton1Click:Connect(function()
+    Config.IsMinimized = false
+    MainFrame.Visible = true
+    MinimizedIcon.Visible = false
 end)
 
 -- Tab Generator
@@ -686,7 +711,19 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     if Config.MenuKeybind and input.KeyCode == Config.MenuKeybind then
         Config.MenuOpen = not Config.MenuOpen
-        MainFrame.Visible = Config.MenuOpen
+        if Config.MenuOpen then
+            if Config.IsMinimized then
+                MainFrame.Visible = false
+                MinimizedIcon.Visible = true
+            else
+                MainFrame.Visible = true
+                MinimizedIcon.Visible = false
+            end
+        else
+            MainFrame.Visible = false
+            MinimizedIcon.Visible = false
+            Config.IsMinimized = false -- Reset minimize state when fully closing menu
+        end
     end
 end)
 
