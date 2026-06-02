@@ -48,6 +48,8 @@ local DragOffset = nil
 local TargetPosition = nil
 local DroneNode = nil
 local SavedPosition = nil
+local IsTweening = false
+local BaseSize = 40
 
 -- UI
 local Gui = Instance.new("ScreenGui")
@@ -130,6 +132,37 @@ ContentArea.Size = UDim2.new(1, -145, 1, -65)
 ContentArea.Position = UDim2.fromOffset(140, 60)
 ContentArea.BackgroundTransparency = 1
 ContentArea.Parent = MainFrame
+
+-- Bottom Right Locked Tray Button
+local TrayBtn = Instance.new("TextButton")
+TrayBtn.Name = "Tray"
+TrayBtn.Size = UDim2.fromOffset(0, 0)
+TrayBtn.Position = UDim2.new(1, -60, 1, -60)
+TrayBtn.AnchorPoint = Vector2.new(0.5, 0.5)
+TrayBtn.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
+TrayBtn.Text = ""
+TrayBtn.Visible = false
+TrayBtn.ZIndex = 10
+TrayBtn.Parent = Gui
+
+local TrayCorner = Instance.new("UICorner")
+TrayCorner.CornerRadius = UDim.new(1, 0)
+TrayCorner.Parent = TrayBtn
+
+local TrayStroke = Instance.new("UIStroke")
+TrayStroke.Color = Color3.fromRGB(0, 255, 150)
+TrayStroke.Thickness = 2
+TrayStroke.Parent = TrayBtn
+
+local TrayLabel = Instance.new("TextLabel")
+TrayLabel.Size = UDim2.new(1, 0, 1, 0)
+TrayLabel.BackgroundTransparency = 1
+TrayLabel.Text = "S"
+TrayLabel.Font = Enum.Font.GothamBold
+TrayLabel.TextSize = 16
+TrayLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
+TrayLabel.ZIndex = 11
+TrayLabel.Parent = TrayBtn
 
 -- Tabs
 local Tabs = {}
@@ -223,9 +256,9 @@ local function CreateSection(parent, title)
     
     Instance.new("UICorner", Section).CornerRadius = UDim.new(0, 10)
     
-    local Stroke = Instance.new("UIStroke", Section)
-    Stroke.Color = Color3.fromRGB(35, 35, 45)
-    Stroke.Thickness = 1
+    local SectionStroke = Instance.new("UIStroke", Section)
+    SectionStroke.Color = Color3.fromRGB(35, 35, 45)
+    SectionStroke.Thickness = 1
     
     local TitleLabel = Instance.new("TextLabel")
     TitleLabel.Size = UDim2.new(1, -20, 0, 28)
@@ -311,7 +344,7 @@ local function CreateToggle(parent, text, configKey, callback)
     ToggleCallbacks[configKey] = Update
 end
 
--- SLIDER WITH HOVER ANIMATIONS
+-- SLIDER WITH HOVER & HOVER SCALE INTERACTION PRESERVED
 local function CreateSlider(parent, text, configKey, min, max, callback)
     local Row = Instance.new("Frame")
     Row.Size = UDim2.new(1, 0, 0, 50)
@@ -388,29 +421,45 @@ local function CreateSlider(parent, text, configKey, min, max, callback)
     Instance.new("UICorner", Glow).CornerRadius = UDim.new(1, 0)
     
     local Holding = false
+    local Hovering = false
+    
+    local function GetCurrentKnobOffset()
+        if Holding then return -10 end
+        if Hovering then return -9 end
+        return -7
+    end
     
     local function Update(input)
         local pos = math.clamp((input.Position.X - Track.AbsolutePosition.X) / Track.AbsoluteSize.X, 0, 1)
         Fill.Size = UDim2.new(pos, 0, 1, 0)
-        Knob.Position = UDim2.new(pos, -7, 0.5, -7)
+        
+        local offset = GetCurrentKnobOffset()
+        Knob.Position = UDim2.new(pos, offset, 0.5, offset)
+        
         local val = math.floor(min + (pos * (max - min)))
         Config[configKey] = val
         ValueLabel.Text = tostring(val)
         if callback then callback(val) end
     end
     
-    Knob.MouseEnter:Connect(function()
-        TweenService:Create(Knob, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {Size = UDim2.fromOffset(18, 18)}):Play()
-        Glow.Visible = true
-        TweenService:Create(Glow, TweenInfo.new(0.2), {Size = UDim2.fromOffset(26, 26), BackgroundTransparency = 0.6}):Play()
+    HitArea.MouseEnter:Connect(function()
+        Hovering = true
+        if not Holding then
+            local ratio = (Config[configKey] - min) / (max - min)
+            TweenService:Create(Knob, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {Size = UDim2.fromOffset(18, 18), Position = UDim2.new(ratio, -9, 0.5, -9)}):Play()
+            Glow.Visible = true
+            TweenService:Create(Glow, TweenInfo.new(0.2), {Size = UDim2.fromOffset(26, 26), BackgroundTransparency = 0.6}):Play()
+        end
     end)
     
-    Knob.MouseLeave:Connect(function()
+    HitArea.MouseLeave:Connect(function()
+        Hovering = false
         if not Holding then
-            TweenService:Create(Knob, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {Size = UDim2.fromOffset(14, 14)}):Play()
+            local ratio = (Config[configKey] - min) / (max - min)
+            TweenService:Create(Knob, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {Size = UDim2.fromOffset(14, 14), Position = UDim2.new(ratio, -7, 0.5, -7)}):Play()
             TweenService:Create(Glow, TweenInfo.new(0.2), {Size = UDim2.fromOffset(0, 0), BackgroundTransparency = 0.8}):Play()
             task.delay(0.2, function()
-                if not Holding then Glow.Visible = false end
+                if not Holding and not Hovering then Glow.Visible = false end
             end)
         end
     end)
@@ -418,7 +467,8 @@ local function CreateSlider(parent, text, configKey, min, max, callback)
     HitArea.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
             Holding = true
-            TweenService:Create(Knob, TweenInfo.new(0.15), {Size = UDim2.fromOffset(20, 20)}):Play()
+            local ratio = (Config[configKey] - min) / (max - min)
+            TweenService:Create(Knob, TweenInfo.new(0.15), {Size = UDim2.fromOffset(20, 20), Position = UDim2.new(ratio, -10, 0.5, -10)}):Play()
             Glow.Visible = true
             TweenService:Create(Glow, TweenInfo.new(0.15), {Size = UDim2.fromOffset(30, 30), BackgroundTransparency = 0.5}):Play()
             Update(input)
@@ -434,10 +484,18 @@ local function CreateSlider(parent, text, configKey, min, max, callback)
     UIS.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 and Holding then
             Holding = false
-            TweenService:Create(Knob, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {Size = UDim2.fromOffset(14, 14)}):Play()
-            TweenService:Create(Glow, TweenInfo.new(0.2), {Size = UDim2.fromOffset(0, 0), BackgroundTransparency = 0.8}):Play()
+            local ratio = (Config[configKey] - min) / (max - min)
+            local targetSize = Hovering and 18 or 14
+            local targetOffset = Hovering and -9 or -7
+            
+            TweenService:Create(Knob, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {Size = UDim2.fromOffset(targetSize, targetSize), Position = UDim2.new(ratio, targetOffset, 0.5, targetOffset)}):Play()
+            
+            local glowSize = Hovering and 26 or 0
+            local glowTrans = Hovering and 0.6 or 0.8
+            TweenService:Create(Glow, TweenInfo.new(0.2), {Size = UDim2.fromOffset(glowSize, glowSize), BackgroundTransparency = glowTrans}):Play()
+            
             task.delay(0.2, function()
-                Glow.Visible = false
+                if not Holding and not Hovering then Glow.Visible = false end
             end)
         end
     end)
@@ -471,9 +529,9 @@ local function CreateKeybindButton(parent, text, configKey, callback)
     
     Instance.new("UICorner", BindBtn).CornerRadius = UDim.new(0, 6)
     
-    local Stroke = Instance.new("UIStroke", BindBtn)
-    Stroke.Color = Color3.fromRGB(45, 45, 55)
-    Stroke.Thickness = 1
+    local BindStroke = Instance.new("UIStroke", BindBtn)
+    BindStroke.Color = Color3.fromRGB(45, 45, 55)
+    BindStroke.Thickness = 1
     
     local Listening = false
     
@@ -672,7 +730,7 @@ FOVCircle.Color = Color3.fromRGB(0, 255, 150)
 FOVCircle.Filled = false
 FOVCircle.NumSides = 64
 
--- Silent Aim
+-- Silent Aim Target Picker
 local function GetTarget()
     local mousePos = UIS:GetMouseLocation()
     local closest = nil
@@ -746,9 +804,125 @@ for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
     end
 end
 
--- Loops
+-- Transition Engine (Stroke Thickness Animate Built In to Fix Minimizing Glitch)
+local function ToggleUI()
+    if IsTweening then return end
+    IsTweening = true
+    Config.IsMinimized = not Config.IsMinimized
+    
+    local speedInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    
+    if Config.IsMinimized then
+        TweenService:Create(Stroke, speedInfo, {Thickness = 0}):Play()
+        
+        local hideMain = TweenService:Create(MainFrame, speedInfo, {
+            Size = UDim2.fromOffset(0, 0),
+            Position = UDim2.new(1, -60, 1, -60)
+        })
+        hideMain:Play()
+        hideMain.Completed:Connect(function()
+            MainFrame.Visible = false
+            TrayBtn.Size = UDim2.fromOffset(0, 0)
+            TrayBtn.Visible = true
+            
+            local showTray = TweenService:Create(TrayBtn, speedInfo, {Size = UDim2.fromOffset(BaseSize, BaseSize)})
+            showTray:Play()
+            showTray.Completed:Connect(function()
+                IsTweening = false
+            end)
+        end)
+    else
+        local hideTray = TweenService:Create(TrayBtn, speedInfo, {Size = UDim2.fromOffset(0, 0)})
+        hideTray:Play()
+        hideTray.Completed:Connect(function()
+            TrayBtn.Visible = false
+            MainFrame.Visible = true
+            
+            TweenService:Create(Stroke, speedInfo, {Thickness = 1.5}):Play()
+            
+            local showMain = TweenService:Create(MainFrame, speedInfo, {
+                Size = UDim2.fromOffset(500, 380),
+                Position = UDim2.new(0.5, 0, 0.5, 0)
+            })
+            showMain:Play()
+            showMain.Completed:Connect(function()
+                IsTweening = false
+            end)
+        end)
+    end
+end
+
+-- Action Connections
+MinBtn.MouseButton1Click:Connect(ToggleUI)
+TrayBtn.MouseButton1Click:Connect(ToggleUI)
+
+-- Drag Top Bar Mechanics
+TopBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        Dragging = true
+        DragOffset = input.Position - MainFrame.AbsolutePosition
+    end
+end)
+
+UIS.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        if Dragging and not Config.IsMinimized then
+            TargetPosition = UDim2.fromOffset(input.Position.X - DragOffset.X + (MainFrame.AbsoluteSize.X * MainFrame.AnchorPoint.X), input.Position.Y - DragOffset.Y + (MainFrame.AbsoluteSize.Y * MainFrame.AnchorPoint.Y))
+        end
+    end
+end)
+
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        Dragging = false
+    end
+end)
+
+-- Global Keybind Handler
+UIS.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    
+    -- Menu keybind
+    if Config.MenuKeybind and input.KeyCode == Config.MenuKeybind then
+        Config.MenuOpen = not Config.MenuOpen
+        if Config.IsMinimized then
+            TrayBtn.Visible = Config.MenuOpen
+        else
+            MainFrame.Visible = Config.MenuOpen
+        end
+    end
+    
+    -- Fly Keybind
+    if Config.FlyKeybind and input.KeyCode == Config.FlyKeybind then
+        if ToggleCallbacks["Flying"] then ToggleCallbacks["Flying"](not Config.Flying) end
+    end
+    
+    -- Noclip Keybind
+    if Config.NoclipKeybind and input.KeyCode == Config.NoclipKeybind then
+        if ToggleCallbacks["Noclip"] then ToggleCallbacks["Noclip"](not Config.Noclip) end
+    end
+    
+    -- Speed Keybind
+    if Config.SpeedKeybind and input.KeyCode == Config.SpeedKeybind then
+        if ToggleCallbacks["SpeedHack"] then ToggleCallbacks["SpeedHack"](not Config.SpeedHack) end
+    end
+    
+    -- Click Teleport action execution
+    if Config.ClickTP and input.UserInputType == Enum.UserInputType.MouseButton1 and UIS:IsKeyDown(Enum.KeyCode.LeftControl) then
+        local mouseRay = Camera:ViewportPointToRay(UIS:GetMouseLocation().X, UIS:GetMouseLocation().Y)
+        local raycastResult = workspace:Raycast(mouseRay.Origin, mouseRay.Direction * 1000)
+        if raycastResult and Player.Character then
+            local root = Player.Character:FindFirstChild("HumanoidRootPart")
+            if root then
+                root.CFrame = CFrame.new(raycastResult.Position + Vector3.new(0, 3, 0))
+            end
+        end
+    end
+end)
+
+-- Main Frame Loop Engine
 RunService.RenderStepped:Connect(function()
-    -- Smooth dragging
+    -- Smooth dragging integration
     if Dragging and TargetPosition then
         local current = MainFrame.Position
         local target = TargetPosition
@@ -761,7 +935,7 @@ RunService.RenderStepped:Connect(function()
         MainFrame.Position = smooth
     end
     
-    -- Fly
+    -- Fly logic execution
     if Config.Flying then
         local char = Player.Character
         if char then
@@ -784,7 +958,7 @@ RunService.RenderStepped:Connect(function()
         end
     end
     
-    -- Drone movement for invis
+    -- Drone tracking calculations for invisibility loop
     if Config.Invisible and DroneNode then
         local move = Vector3.zero
         if UIS:IsKeyDown(Enum.KeyCode.W) then move += Camera.CFrame.LookVector end
@@ -805,6 +979,7 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
+-- Noclip Physics Loop
 RunService.Stepped:Connect(function()
     if Config.Noclip then
         local char = Player.Character
@@ -818,12 +993,12 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- ESP Loop
+-- Visuals / ESP / FOV Render Loop
 RunService.RenderStepped:Connect(function()
     local rainbowColor = Color3.fromHSV((tick() * 0.5) % 1, 1, 1)
     local espColor = Config.ESPRainbow and rainbowColor or Color3.fromRGB(0, 255, 150)
     
-    FOVCircle.Visible = Config.SilentAim
+    FOVCircle.Visible = Config.SilentAim and Config.MenuOpen and not Config.IsMinimized
     FOVCircle.Position = UIS:GetMouseLocation()
     FOVCircle.Radius = Config.SilentAimFOV
     FOVCircle.Color = espColor
@@ -883,174 +1058,3 @@ RunService.RenderStepped:Connect(function()
         end
     end
 end)
-
--- Input
-UIS.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    
-    if input.KeyCode == Config.MenuKeybind then
-        if Config.IsMinimized then
-            MinCircle.MouseButton1Click:Fire()
-        else
-            Config.MenuOpen = not Config.MenuOpen
-            MainFrame.Visible = Config.MenuOpen
-        end
-    end
-    
-    if Config.FlyKeybind and input.KeyCode == Config.FlyKeybind then
-        if ToggleCallbacks["Flying"] then
-            ToggleCallbacks["Flying"](not Config.Flying)
-        end
-    end
-    
-    if Config.NoclipKeybind and input.KeyCode == Config.NoclipKeybind then
-        if ToggleCallbacks["Noclip"] then
-            ToggleCallbacks["Noclip"](not Config.Noclip)
-        end
-    end
-    
-    if Config.SpeedKeybind and input.KeyCode == Config.SpeedKeybind then
-        if ToggleCallbacks["SpeedHack"] then
-            ToggleCallbacks["SpeedHack"](not Config.SpeedHack)
-        end
-    end
-    
-    if input.KeyCode == Enum.KeyCode.Space and Config.InfiniteJump then
-        local char = Player.Character
-        if char then
-            local hum = char:FindFirstChildOfClass("Humanoid")
-            if hum then
-                hum:ChangeState(Enum.HumanoidStateType.Jumping)
-            end
-        end
-    end
-    
-    if input.UserInputType == Enum.UserInputType.MouseButton1 and Config.ClickTP and UIS:IsKeyDown(Enum.KeyCode.LeftControl) then
-        local char = Player.Character
-        if char then
-            local root = char:FindFirstChild("HumanoidRootPart")
-            if root then
-                local mousePos = UIS:GetMouseLocation()
-                local ray = Camera:ViewportPointToRay(mousePos.X, mousePos.Y)
-                local result = workspace:Raycast(ray.Origin, ray.Direction * 500)
-                if result then
-                    root.CFrame = CFrame.new(result.Position + Vector3.new(0, 3, 0))
-                end
-            end
-        end
-    end
-end)
-
--- SMOOTH DRAGGING
-TopBar.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        Dragging = true
-        local mousePos = UIS:GetMouseLocation()
-        local framePos = MainFrame.AbsolutePosition
-        DragOffset = mousePos - framePos
-    end
-end)
-
-UIS.InputChanged:Connect(function(input)
-    if Dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-        local mousePos = UIS:GetMouseLocation()
-        local newPos = mousePos - DragOffset
-        TargetPosition = UDim2.fromOffset(newPos.X, newPos.Y)
-    end
-end)
-
-UIS.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        Dragging = false
-        DragOffset = nil
-        TargetPosition = nil
-    end
-end)
-
--- MINIMIZE CIRCLE
-local MinCircle = Instance.new("TextButton")
-MinCircle.Name = "MinCircle"
-MinCircle.Size = UDim2.fromOffset(0, 0)
-MinCircle.Position = UDim2.new(1, -70, 1, -70)
-MinCircle.AnchorPoint = Vector2.new(0.5, 0.5)
-MinCircle.BackgroundColor3 = Color3.fromRGB(15, 15, 22)
-MinCircle.Text = "S"
-MinCircle.Font = Enum.Font.GothamBold
-MinCircle.TextSize = 22
-MinCircle.TextColor3 = Color3.fromRGB(0, 255, 150)
-MinCircle.Visible = false
-MinCircle.Parent = Gui
-
-Instance.new("UICorner", MinCircle).CornerRadius = UDim.new(1, 0)
-
-local CircleStroke = Instance.new("UIStroke", MinCircle)
-CircleStroke.Color = Color3.fromRGB(0, 255, 150)
-CircleStroke.Thickness = 2
-
--- MINIMIZE FUNCTION
-MinBtn.MouseButton1Click:Connect(function()
-    if Config.IsMinimized then return end
-    Config.IsMinimized = true
-    
-    -- Get circle position in absolute coordinates
-    local circleAbsPos = Vector2.new(
-        Camera.ViewportSize.X - 70,
-        Camera.ViewportSize.Y - 70
-    )
-    
-    -- Animate to circle position and shrink
-    TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
-        Size = UDim2.fromOffset(0, 0),
-        Position = UDim2.fromOffset(circleAbsPos.X, circleAbsPos.Y)
-    }):Play()
-    
-    task.wait(0.4)
-    MainFrame.Visible = false
-    
-    -- Show circle with bounce
-    MinCircle.Visible = true
-    MinCircle.Size = UDim2.fromOffset(0, 0)
-    TweenService:Create(MinCircle, TweenInfo.new(0.5, Enum.EasingStyle.Elastic, Enum.EasingDirection.Out), {
-        Size = UDim2.fromOffset(55, 55)
-    }):Play()
-end)
-
--- RESTORE FUNCTION
-MinCircle.MouseButton1Click:Connect(function()
-    if not Config.IsMinimized then return end
-    Config.IsMinimized = false
-    
-    -- Shrink circle
-    TweenService:Create(MinCircle, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-        Size = UDim2.fromOffset(0, 0)
-    }):Play()
-    
-    task.wait(0.25)
-    MinCircle.Visible = false
-    
-    -- Restore main frame with bounce
-    MainFrame.Visible = true
-    TweenService:Create(MainFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-        Size = UDim2.fromOffset(500, 380),
-        Position = UDim2.new(0.5, 0, 0.5, 0)
-    }):Play()
-end)
-
--- Circle hover
-MinCircle.MouseEnter:Connect(function()
-    TweenService:Create(MinCircle, TweenInfo.new(0.2), {Size = UDim2.fromOffset(65, 65)}):Play()
-    TweenService:Create(CircleStroke, TweenInfo.new(0.2), {Thickness = 3}):Play()
-end)
-
-MinCircle.MouseLeave:Connect(function()
-    TweenService:Create(MinCircle, TweenInfo.new(0.2), {Size = UDim2.fromOffset(55, 55)}):Play()
-    TweenService:Create(CircleStroke, TweenInfo.new(0.2), {Thickness = 2}):Play()
-end)
-
--- Entrance animation
-MainFrame.Size = UDim2.fromOffset(0, 0)
-TweenService:Create(MainFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-    Size = UDim2.fromOffset(500, 380)
-}):Play()
-
-print("SlimHub Loaded")
