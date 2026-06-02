@@ -18,27 +18,24 @@ local Config = {
     SpeedKeybind = nil, IsMinimized = false, MenuOpen = true, ActiveTab = "Main"
 }
 
--- Global variables for the new CFrame Fly system
-local FlyTargetCFrame = CFrame.new()
-local AnimationTrack = nil
-
 local ESPObjects = {}
 local ToggleCallbacks = {}
 local DronePosition = nil
 local SavedPosition = nil
 local MenuPositionBeforeMinimize = UDim2.new(0.5, 0, 0.5, 0)
 local ShootRemotes = {}
+local CurrentFlyVelocity = Vector3.zero
 
+-- Smooth Animation State Tracking
+local CurrentTiltX = 0
+local CurrentTiltZ = 0
+local CurrentBobbing = 0
+
+-- UI Setup
 local Gui = Instance.new("ScreenGui")
 Gui.Name = "SlimHub"
 Gui.ResetOnSpawn = false
-
-local Success, Error = pcall(function()
-    Gui.Parent = CoreGui
-end)
-if not Success then
-    Gui.Parent = Player:WaitForChild("PlayerGui")
-end
+Gui.Parent = CoreGui
 
 local MainFrame = Instance.new("Frame", Gui)
 MainFrame.Name = "MainFrame"
@@ -71,6 +68,7 @@ Title.TextSize = 16
 Title.TextColor3 = Color3.fromRGB(0, 255, 150)
 Title.TextXAlignment = Enum.TextXAlignment.Left
 
+-- DRAG
 local Dragging, DragOffset = false, Vector2.zero
 TopBar.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -99,6 +97,7 @@ ContentArea.Size = UDim2.new(1, -145, 1, -65)
 ContentArea.Position = UDim2.fromOffset(140, 60)
 ContentArea.BackgroundTransparency = 1
 
+-- Minimized Icon
 local MinimizedIcon = Instance.new("TextButton", Gui)
 MinimizedIcon.Name = "MinimizedIcon"
 MinimizedIcon.Size = UDim2.fromOffset(45, 45)
@@ -167,6 +166,7 @@ end
 MinBtn.MouseButton1Click:Connect(MinimizeMenu)
 MinimizedIcon.MouseButton1Click:Connect(MaximizeMenu)
 
+-- Tabs & UI Elements
 local Tabs = {}
 local function CreateTab(name)
     local Tab = Instance.new("ScrollingFrame", ContentArea)
@@ -257,10 +257,8 @@ local function CreateToggle(parent, text, configKey, callback)
     local Row = Instance.new("Frame", parent)
     Row.Size = UDim2.new(1, 0, 0, 36)
     Row.BackgroundTransparency = 1
-    
     local Label = Instance.new("TextLabel", Row)
     Label.Size = UDim2.new(1, -70, 1, 0)
-    Label.Position = UDim2.fromOffset(0, 0)
     Label.BackgroundTransparency = 1
     Label.Text = text
     Label.Font = Enum.Font.Gotham
@@ -284,49 +282,10 @@ local function CreateToggle(parent, text, configKey, callback)
     
     local function Update(state)
         Config[configKey] = state
-        TweenService:Create(ToggleBtn, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
-            BackgroundColor3 = state and Color3.fromRGB(0, 255, 150) or (Row:GetAttribute("Hovering") and Color3.fromRGB(45, 45, 58) or Color3.fromRGB(35, 35, 45))
-        }):Play()
-        TweenService:Create(Knob, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-            Position = state and UDim2.new(1, -21, 0.5, -9) or UDim2.new(0, 3, 0.5, -9)
-        }):Play()
+        TweenService:Create(ToggleBtn, TweenInfo.new(0.2), {BackgroundColor3 = state and Color3.fromRGB(0, 255, 150) or Color3.fromRGB(35, 35, 45)}):Play()
+        TweenService:Create(Knob, TweenInfo.new(0.2), {Position = state and UDim2.new(1, -21, 0.5, -9) or UDim2.new(0, 3, 0.5, -9)}):Play()
         if callback then callback(state) end
     end
-    
-    -- HOVER ANIMATIONS
-    local HoverArea = Instance.new("TextButton", Row)
-    HoverArea.Size = UDim2.fromScale(1, 1)
-    HoverArea.BackgroundTransparency = 1
-    HoverArea.Text = ""
-    HoverArea.ZIndex = 0
-    
-    HoverArea.MouseEnter:Connect(function()
-        Row:SetAttribute("Hovering", true)
-        TweenService:Create(Label, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
-            TextColor3 = Color3.fromRGB(255, 255, 255),
-            Position = UDim2.fromOffset(4, 0) -- Subtle indent animation
-        }):Play()
-        if not Config[configKey] then
-            TweenService:Create(ToggleBtn, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
-                BackgroundColor3 = Color3.fromRGB(45, 45, 58)
-            }):Play()
-        end
-    end)
-    
-    HoverArea.MouseLeave:Connect(function()
-        Row:SetAttribute("Hovering", nil)
-        TweenService:Create(Label, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
-            TextColor3 = Color3.fromRGB(220, 220, 230),
-            Position = UDim2.fromOffset(0, 0)
-        }):Play()
-        if not Config[configKey] then
-            TweenService:Create(ToggleBtn, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
-                BackgroundColor3 = Color3.fromRGB(35, 35, 45)
-            }):Play()
-        end
-    end)
-    
-    HoverArea.MouseButton1Click:Connect(function() Update(not Config[configKey]) end)
     ToggleBtn.MouseButton1Click:Connect(function() Update(not Config[configKey]) end)
     ToggleCallbacks[configKey] = Update
 end
@@ -376,21 +335,14 @@ local function CreateSlider(parent, text, configKey, min, max, callback)
     Instance.new("UICorner", Knob).CornerRadius = UDim.new(1, 0)
 
     local Holding = false
-    local function Update(input, isDragging)
+    local function Update(input)
         local pos = math.clamp((input.Position.X - Track.AbsolutePosition.X) / Track.AbsoluteSize.X, 0, 1)
+        Fill.Size = UDim2.new(pos, 0, 1, 0); Knob.Position = UDim2.new(pos, -7, 0.5, -7)
         local val = math.floor(min + (pos * (max - min))); Config[configKey] = val
-        ValueLabel.Text = tostring(val)
-        
-        local tweenTime = isDragging and 0.05 or 0.25
-        local tInfo = TweenInfo.new(tweenTime, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
-        
-        TweenService:Create(Fill, tInfo, {Size = UDim2.new(pos, 0, 1, 0)}):Play()
-        TweenService:Create(Knob, tInfo, {Position = UDim2.new(pos, -7, 0.5, -7)}):Play()
-        
-        if callback then callback(val) end
+        ValueLabel.Text = tostring(val); if callback then callback(val) end
     end
-    HitArea.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then Holding = true; Update(input, false) end end)
-    UIS.InputChanged:Connect(function(input) if Holding and input.UserInputType == Enum.UserInputType.MouseMovement then Update(input, true) end end)
+    HitArea.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then Holding = true; Update(input) end end)
+    UIS.InputChanged:Connect(function(input) if Holding and input.UserInputType == Enum.UserInputType.MouseMovement then Update(input) end end)
     UIS.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 and Holding then Holding = false end end)
 end
 
@@ -434,42 +386,9 @@ local function CreateKeybindButton(parent, text, configKey, callback)
     end)
 end
 
+-- Menus
 local MainSection = CreateSection(Tabs.Main, "Movement")
-
-local function ClearFlight()
-    if AnimationTrack then AnimationTrack:Stop(); AnimationTrack:Destroy(); AnimationTrack = nil end
-    local char = Player.Character
-    local hum = char and char:FindFirstChildOfClass("Humanoid")
-    if hum then 
-        hum.PlatformStand = false
-    end
-end
-
-local function StartFlight()
-    ClearFlight()
-    local char = Player.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    local hum = char and char:FindFirstChildOfClass("Humanoid")
-    if not root or not hum then return end
-    
-    FlyTargetCFrame = root.CFrame
-    
-    local animProvider = hum:FindFirstChildOfClass("Animator") or Instance.new("Animator", hum)
-    local flyAnim = Instance.new("Animation")
-    flyAnim.AnimationId = "rbxassetid://616006778"
-    
-    pcall(function()
-        AnimationTrack = animProvider:LoadAnimation(flyAnim)
-        AnimationTrack.Priority = Enum.AnimationPriority.Movement
-        AnimationTrack:Play(0.2)
-        AnimationTrack:AdjustSpeed(0)
-    end)
-end
-
-CreateToggle(MainSection, "Fly", "Flying", function(state)
-    if state then StartFlight() else ClearFlight() end
-end)
-
+CreateToggle(MainSection, "Fly", "Flying")
 CreateSlider(MainSection, "Fly Speed", "FlySpeed", 16, 250)
 CreateToggle(MainSection, "Speed Hack", "SpeedHack", function(state)
     local char = Player.Character or Player.CharacterAdded:Wait()
@@ -510,11 +429,14 @@ CreateToggle(MainSection, "Invisibility", "Invisible", function(state)
 end)
 CreateToggle(MainSection, "Infinite Jump", "InfiniteJump")
 
+-- Infinite Jump Logic
 UIS.InputBegan:Connect(function(input, gameProcessed)
     if not gameProcessed and Config.InfiniteJump and input.KeyCode == Enum.KeyCode.Space then
         local char = Player.Character
         local hum = char and char:FindFirstChildOfClass("Humanoid")
-        if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
+        if hum then
+            hum:ChangeState(Enum.HumanoidStateType.Jumping)
+        end
     end
 end)
 
@@ -549,6 +471,7 @@ CreateKeybindButton(SettingsSection, "Fly Toggle", "FlyKeybind")
 CreateKeybindButton(SettingsSection, "Noclip Toggle", "NoclipKeybind")
 CreateKeybindButton(SettingsSection, "Speed Toggle", "SpeedKeybind")
 
+-- ESP Creation
 local function CreateESP(player)
     if ESPObjects[player] then return end
     local box = Drawing.new("Square"); box.Thickness = 1; box.Color = Color3.fromRGB(0, 255, 150); box.Filled = false; box.Visible = false
@@ -557,6 +480,7 @@ local function CreateESP(player)
     ESPObjects[player] = {Box = box, Name = name, Tracer = tracer}
 end
 
+-- KEYBINDS & MENU TOGGLE
 UIS.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     if Config.MenuKeybind and input.KeyCode == Config.MenuKeybind then
@@ -588,6 +512,7 @@ end)
 local FOVCircle = Drawing.new("Circle"); FOVCircle.Visible = false; FOVCircle.Thickness = 1.5
 FOVCircle.Color = Color3.fromRGB(0, 255, 150); FOVCircle.Filled = false; FOVCircle.NumSides = 64
 
+-- SILENT AIM
 local function GetTarget()
     local mousePos = UIS:GetMouseLocation()
     local closest = nil
@@ -694,142 +619,155 @@ if hookmetamethod then
     end)
 end
 
-Player.CharacterAdding:Connect(function()
-    ClearFlight()
-    Config.Flying = false
-    if ToggleCallbacks.Flying then ToggleCallbacks.Flying(false) end
-end)
-
-RunService.RenderStepped:Connect(function(deltaTime)
+-- LOOPS
+RunService.RenderStepped:Connect(function()
     local char = Player.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
-    local hum = char and char:FindFirstChildOfClass("Humanoid")
     
-    -- MATHEMATICAL DELTA-TIME LERP FLYING SYSTEM
-    if Config.Flying and root and hum then
-        hum.PlatformStand = true
-        
+    -- Smooth Fly Logic with Procedural Character Animations
+    if Config.Flying and root then
         local moveDir = Vector3.zero
-        if UIS:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + Camera.CFrame.LookVector end
-        if UIS:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - Camera.CFrame.LookVector end
-        if UIS:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - Camera.CFrame.RightVector end
-        if UIS:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + Camera.CFrame.RightVector end
-        if UIS:IsKeyDown(Enum.KeyCode.Space) then moveDir = moveDir + Vector3.new(0, 1, 0) end
-        if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then moveDir = moveDir - Vector3.new(0, 1, 0) end
+        local inputW = UIS:IsKeyDown(Enum.KeyCode.W) and 1 or 0
+        local inputS = UIS:IsKeyDown(Enum.KeyCode.S) and 1 or 0
+        local inputA = UIS:IsKeyDown(Enum.KeyCode.A) and 1 or 0
+        local inputD = UIS:IsKeyDown(Enum.KeyCode.D) and 1 or 0
+        local inputSpace = UIS:IsKeyDown(Enum.KeyCode.Space) and 1 or 0
+        local inputCtrl = UIS:IsKeyDown(Enum.KeyCode.LeftControl) and 1 or 0
         
-        local look = Camera.CFrame.LookVector
-        local targetCFrame = FlyTargetCFrame
+        if inputW == 1 then moveDir += Camera.CFrame.LookVector end
+        if inputS == 1 then moveDir -= Camera.CFrame.LookVector end
+        if inputA == 1 then moveDir -= Camera.CFrame.RightVector end
+        if inputD == 1 then moveDir += Camera.CFrame.RightVector end
+        if inputSpace == 1 then moveDir += Vector3.yAxis end
+        if inputCtrl == 1 then moveDir -= Vector3.yAxis end
         
-        if moveDir.Magnitude > 0 then
-            if AnimationTrack then AnimationTrack:AdjustSpeed(1) end
-            local newPos = targetCFrame.Position + (moveDir.Unit * Config.FlySpeed * deltaTime)
+        local targetVelocity = moveDir.Magnitude > 0 and moveDir.Unit * Config.FlySpeed or Vector3.zero
+        CurrentFlyVelocity = CurrentFlyVelocity:Lerp(targetVelocity, 0.1)
+        root.AssemblyLinearVelocity = CurrentFlyVelocity
+        
+        -- Procedural Character Animation (Swaying, Bobbing, Tilting)
+        local rootJoint = root:FindFirstChild("RootJoint") or (char and char:FindFirstChild("LowerTorso") and char.LowerTorso:FindFirstChild("RootJoint"))
+        if rootJoint then
+            local currentSpeed = CurrentFlyVelocity.Magnitude
             
-            local horizontalMove = Vector3.new(moveDir.X, 0, moveDir.Z)
-            if horizontalMove.Magnitude > 0 then
-                local forwardSpace = root.CFrame:VectorToWorldSpace(Vector3.new(0, 0, -1))
-                local dot = horizontalMove.Unit:Dot(forwardSpace)
-                local rightSpace = root.CFrame:VectorToWorldSpace(Vector3.new(1, 0, 0))
-                local rightDot = horizontalMove.Unit:Dot(rightSpace)
-                
-                local tiltAngle = math.rad(-15) * math.clamp(dot, -1, 1)
-                local rollAngle = math.rad(-15) * math.clamp(rightDot, -1, 1)
-                
-                FlyTargetCFrame = CFrame.new(newPos, newPos + Vector3.new(look.X, 0, look.Z)) * CFrame.Angles(tiltAngle, 0, rollAngle)
-            else
-                FlyTargetCFrame = CFrame.new(newPos, newPos + Vector3.new(look.X, 0, look.Z))
+            -- Dynamic targets based on flight direction and speed
+            local targetTiltX = 0
+            local targetTiltZ = 0
+            
+            if currentSpeed > 1 then
+                local localVelocity = root.CFrame:VectorToObjectSpace(CurrentFlyVelocity)
+                targetTiltX = math.clamp(-localVelocity.Z / Config.FlySpeed * 0.4, -0.4, 0.4)
+                targetTiltZ = math.clamp(-localVelocity.X / Config.FlySpeed * 0.3, -0.3, 0.3)
             end
-        else
-            if AnimationTrack then AnimationTrack:AdjustSpeed(0) end
-            FlyTargetCFrame = CFrame.new(targetCFrame.Position, targetCFrame.Position + Vector3.new(look.X, 0, look.Z))
+            
+            -- Continuous idle breathing/floating bob effect
+            CurrentBobbing = math.sin(tick() * 3) * 0.08
+            
+            -- Smoothed interpolation for transitions
+            CurrentTiltX = math.clamp(CurrentTiltX + (targetTiltX - CurrentTiltX) * 0.1, -0.5, 0.5)
+            CurrentTiltZ = math.clamp(CurrentTiltZ + (targetTiltZ - CurrentTiltZ) * 0.1, -0.4, 0.4)
+            
+            -- Apply transformations safely to the joint C1 property
+            rootJoint.C1 = CFrame.new(0, CurrentBobbing, 0) 
+                * CFrame.Angles(math.rad(-90) + CurrentTiltX, math.rad(180), math.rad(180) + CurrentTiltZ)
         end
         
-        -- Framerate independent linear interpolation (Lerp) for supreme smoothness
-        root.CFrame = root.CFrame:Lerp(FlyTargetCFrame, math.clamp(18 * deltaTime, 0, 1))
-        root.AssemblyLinearVelocity = Vector3.zero
-        root.AssemblyAngularVelocity = Vector3.zero
+        -- Camera Banking
+        local targetRoll = 0
+        if inputA == 1 then targetRoll = 12 end
+        if inputD == 1 then targetRoll = -12 end
+        local currentAngles = {Camera.CFrame:ToEulerAnglesYXZ()}
+        local lerpedRoll = math.rad(targetRoll)
+        Camera.CFrame = CFrame.new(Camera.CFrame.Position) * CFrame.Angles(currentAngles[1], currentAngles[2], math.clamp(currentAngles[3] + (lerpedRoll - currentAngles[3]) * 0.1, -math.rad(12), math.rad(12)))
+    else
+        CurrentFlyVelocity = Vector3.zero
+        
+        -- Restore original joint orientations cleanly when flying is disabled
+        local rootJoint = char and char:FindFirstChild("HumanoidRootPart") and char.HumanoidRootPart:FindFirstChild("RootJoint") or (char and char:FindFirstChild("LowerTorso") and char.LowerTorso:FindFirstChild("RootJoint"))
+        if rootJoint then
+            rootJoint.C1 = CFrame.new(0, 0, 0) * CFrame.Angles(math.rad(-90), math.rad(180), math.rad(180))
+        end
+        CurrentTiltX = 0
+        CurrentTiltZ = 0
+        CurrentBobbing = 0
     end
     
+    -- Invisible Movement
     if Config.Invisible and DronePosition and root then
         local moveDir = Vector3.zero
-        if UIS:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + Camera.CFrame.LookVector end
-        if UIS:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - Camera.CFrame.LookVector end
-        if UIS:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - Camera.CFrame.RightVector end
-        if UIS:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + Camera.CFrame.RightVector end
+        if UIS:IsKeyDown(Enum.KeyCode.W) then moveDir += Camera.CFrame.LookVector end
+        if UIS:IsKeyDown(Enum.KeyCode.S) then moveDir -= Camera.CFrame.LookVector end
+        if UIS:IsKeyDown(Enum.KeyCode.A) then moveDir -= Camera.CFrame.RightVector end
+        if UIS:IsKeyDown(Enum.KeyCode.D) then moveDir += Camera.CFrame.RightVector end
         local speed = Config.SpeedHack and Config.HackSpeed or Config.DroneSpeed
         if moveDir.Magnitude > 0 then
-            DronePosition = DronePosition + Vector3.new(moveDir.X, 0, moveDir.Z).Unit * speed * deltaTime
+            DronePosition += Vector3.new(moveDir.X, 0, moveDir.Z).Unit * speed * 0.016
         end
         root.CFrame = CFrame.new(DronePosition.X, DronePosition.Y - 100, DronePosition.Z)
-    end
-
-    if Config.SilentAim then
-        local mousePos = UIS:GetMouseLocation()
-        FOVCircle.Position = mousePos
-        FOVCircle.Radius = Config.SilentAimFOV
-        FOVCircle.Visible = true
-    else
-        FOVCircle.Visible = false
-    end
-
-    local tickValue = tick()
-    local rainbowColor = Color3.fromHSV((tickValue % 5) / 5, 1, 1)
-    
-    for p, drawings in pairs(ESPObjects) do
-        local box = drawings.Box
-        local name = drawings.Name
-        local tracer = drawings.Tracer
-        
-        local pChar = p.Character
-        local pRoot = pChar and pChar:FindFirstChild("HumanoidRootPart")
-        local pHum = pChar and pChar:FindFirstChildOfClass("Humanoid")
-        
-        if Config.ESPEnabled and pRoot and pHum and pHum.Health > 0 then
-            local pos, onScreen = Camera:WorldToViewportPoint(pRoot.Position)
-            
-            if onScreen then
-                local currentC = Config.ESPRainbow and rainbowColor or Color3.fromRGB(0, 255, 150)
-                local factor = 1 / (pos.Z * math.tan(math.rad(Camera.FieldOfView / 2))) * 1000
-                local w, h = 4 * factor, 6 * factor
-                
-                box.Size = Vector2.new(w, h)
-                box.Position = Vector2.new(pos.X - w / 2, pos.Y - h / 2)
-                box.Color = currentC
-                box.Visible = true
-                
-                if Config.ESPNames then
-                    name.Text = p.Name .. " [" .. math.floor(pHum.Health) .. "]"
-                    name.Position = Vector2.new(pos.X, (pos.Y - h / 2) - 15)
-                    name.Visible = true
-                else
-                    name.Visible = false
-                end
-                
-                if Config.ESPTracers then
-                    tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
-                    tracer.To = Vector2.new(pos.X, pos.Y + h / 2)
-                    tracer.Color = currentC
-                    tracer.Visible = true
-                else
-                    tracer.Visible = false
-                end
-            else
-                box.Visible = false; name.Visible = false; tracer.Visible = false
-            end
-        else
-            box.Visible = false; name.Visible = false; tracer.Visible = false
-        end
     end
 end)
 
 RunService.Stepped:Connect(function()
-    if Config.Noclip then
-        local char = Player.Character
-        if char then
-            for _, part in ipairs(char:GetDescendants()) do
-                if part:IsA("BasePart") and part.CanCollide then
-                    part.CanCollide = false
+    if Config.Noclip and Player.Character then
+        for _, part in ipairs(Player.Character:GetDescendants()) do
+            if part:IsA("BasePart") then part.CanCollide = false end
+        end
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    local espColor = Config.ESPRainbow and Color3.fromHSV((tick() * 0.5) % 1, 1, 1) or Color3.fromRGB(0, 255, 150)
+    FOVCircle.Visible = Config.SilentAim; FOVCircle.Position = UIS:GetMouseLocation()
+    FOVCircle.Radius = Config.SilentAimFOV; FOVCircle.Color = espColor
+    
+    for p, drawings in pairs(ESPObjects) do
+        if Config.ESPEnabled and p.Character then
+            local root = p.Character:FindFirstChild("HumanoidRootPart")
+            local humanoid = p.Character:FindFirstChildOfClass("Humanoid")
+            if root and humanoid and humanoid.Health > 0 then
+                local pos, onScreen = Camera:WorldToViewportPoint(root.Position)
+                
+                if Config.ESPTracers and onScreen and Player.Character then
+                    local localRoot = Player.Character:FindFirstChild("HumanoidRootPart")
+                    if localRoot then
+                        local myPos = Camera:WorldToViewportPoint(localRoot.Position)
+                        drawings.Tracer.From = Vector2.new(myPos.X, myPos.Y)
+                        drawings.Tracer.To = Vector2.new(pos.X, pos.Y)
+                        drawings.Tracer.Color = espColor
+                        drawings.Tracer.Visible = true
+                    end
+                else
+                    drawings.Tracer.Visible = false
                 end
+
+                if onScreen then
+                    local sizeY = math.abs(Camera:WorldToViewportPoint(root.Position + Vector3.new(0, 3, 0)).Y - Camera:WorldToViewportPoint(root.Position - Vector3.new(0, 3, 0)).Y)
+                    drawings.Box.Size = Vector2.new(sizeY * 0.6, sizeY)
+                    drawings.Box.Position = Vector2.new(pos.X - (sizeY * 0.3), pos.Y - sizeY/2)
+                    drawings.Box.Color = espColor
+                    drawings.Box.Visible = true
+                    
+                    if Config.ESPNames then
+                        drawings.Name.Text = p.Name
+                        drawings.Name.Position = Vector2.new(pos.X, pos.Y - (sizeY/2) - 15)
+                        drawings.Name.Color = Color3.fromRGB(255, 255, 255)
+                        drawings.Name.Visible = true
+                    else
+                        drawings.Name.Visible = false
+                    end
+                else
+                    drawings.Box.Visible = false
+                    drawings.Name.Visible = false
+                end
+            else
+                drawings.Box.Visible = false
+                drawings.Name.Visible = false
+                drawings.Tracer.Visible = false
             end
+        else
+            drawings.Box.Visible = false
+            drawings.Name.Visible = false
+            drawings.Tracer.Visible = false
         end
     end
 end)
