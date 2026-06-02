@@ -24,11 +24,6 @@ local DronePosition = nil
 local SavedPosition = nil
 local MenuPositionBeforeMinimize = UDim2.new(0.5, 0, 0.5, 0)
 local ShootRemotes = {}
-local CurrentFlyVelocity = Vector3.zero
-
-local CurrentTiltX = 0
-local CurrentTiltZ = 0
-local CurrentBobbing = 0
 
 local Gui = Instance.new("ScreenGui")
 Gui.Name = "SlimHub"
@@ -388,7 +383,15 @@ local function CreateKeybindButton(parent, text, configKey, callback)
 end
 
 local MainSection = CreateSection(Tabs.Main, "Movement")
-CreateToggle(MainSection, "Fly", "Flying")
+CreateToggle(MainSection, "Fly", "Flying", function(state)
+    local char = Player.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if not state and root and hum then
+        root.AssemblyLinearVelocity = Vector3.zero
+        hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+    end
+end)
 CreateSlider(MainSection, "Fly Speed", "FlySpeed", 16, 250)
 CreateToggle(MainSection, "Speed Hack", "SpeedHack", function(state)
     local char = Player.Character or Player.CharacterAdded:Wait()
@@ -608,7 +611,7 @@ if hookmetamethod then
     local oldNamecall
     oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
         local method = getnamecallmethod()
-        if method == "FireServer" and Config.SilentAim and self:IsA("RemoteEvent") and (IsShootRemote(self) or table.find(ShootRemotes, self)) then
+        if method == "FireServer" and Config.SilentAim feeling and self:IsA("RemoteEvent") and (IsShootRemote(self) or table.find(ShootRemotes, self)) then
             return oldNamecall(self, unpack(ModifyArgs({...})))
         end
         return oldNamecall(self, ...)
@@ -618,65 +621,24 @@ end
 RunService.RenderStepped:Connect(function()
     local char = Player.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
     
-    if Config.Flying and root then
+    if Config.Flying and root and hum then
+        hum:ChangeState(Enum.HumanoidStateType.Physics)
+        
         local moveDir = Vector3.zero
-        local inputW = UIS:IsKeyDown(Enum.KeyCode.W) and 1 or 0
-        local inputS = UIS:IsKeyDown(Enum.KeyCode.S) and 1 or 0
-        local inputA = UIS:IsKeyDown(Enum.KeyCode.A) and 1 or 0
-        local inputD = UIS:IsKeyDown(Enum.KeyCode.D) and 1 or 0
-        local inputSpace = UIS:IsKeyDown(Enum.KeyCode.Space) and 1 or 0
-        local inputCtrl = UIS:IsKeyDown(Enum.KeyCode.LeftControl) and 1 or 0
+        if UIS:IsKeyDown(Enum.KeyCode.W) then moveDir += Camera.CFrame.LookVector end
+        if UIS:IsKeyDown(Enum.KeyCode.S) then moveDir -= Camera.CFrame.LookVector end
+        if UIS:IsKeyDown(Enum.KeyCode.A) then moveDir -= Camera.CFrame.RightVector end
+        if UIS:IsKeyDown(Enum.KeyCode.D) then moveDir += Camera.CFrame.RightVector end
+        if UIS:IsKeyDown(Enum.KeyCode.Space) then moveDir += Vector3.yAxis end
+        if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then moveDir -= Vector3.yAxis end
         
-        if inputW == 1 then moveDir += Camera.CFrame.LookVector end
-        if inputS == 1 then moveDir -= Camera.CFrame.LookVector end
-        if inputA == 1 then moveDir -= Camera.CFrame.RightVector end
-        if inputD == 1 then moveDir += Camera.CFrame.RightVector end
-        if inputSpace == 1 then moveDir += Vector3.yAxis end
-        if inputCtrl == 1 then moveDir -= Vector3.yAxis end
-        
-        local targetVelocity = moveDir.Magnitude > 0 and moveDir.Unit * Config.FlySpeed or Vector3.zero
-        CurrentFlyVelocity = CurrentFlyVelocity:Lerp(targetVelocity, 0.1)
-        root.AssemblyLinearVelocity = CurrentFlyVelocity
-        
-        local rootJoint = root:FindFirstChild("RootJoint") or (char and char:FindFirstChild("LowerTorso") and char.LowerTorso:FindFirstChild("RootJoint"))
-        if rootJoint then
-            local currentSpeed = CurrentFlyVelocity.Magnitude
-            
-            local targetTiltX = 0
-            local targetTiltZ = 0
-            
-            if currentSpeed > 1 then
-                local localVelocity = root.CFrame:VectorToObjectSpace(CurrentFlyVelocity)
-                targetTiltX = math.clamp(-localVelocity.Z / Config.FlySpeed * 0.4, -0.4, 0.4)
-                targetTiltZ = math.clamp(-localVelocity.X / Config.FlySpeed * 0.3, -0.3, 0.3)
-            end
-            
-            CurrentBobbing = math.sin(tick() * 3) * 0.08
-            
-            CurrentTiltX = math.clamp(CurrentTiltX + (targetTiltX - CurrentTiltX) * 0.1, -0.5, 0.5)
-            CurrentTiltZ = math.clamp(CurrentTiltZ + (targetTiltZ - CurrentTiltZ) * 0.1, -0.4, 0.4)
-            
-            rootJoint.C1 = CFrame.new(0, CurrentBobbing, 0) 
-                * CFrame.Angles(math.rad(-90) + CurrentTiltX, math.rad(180), math.rad(180) + CurrentTiltZ)
+        if moveDir.Magnitude > 0 then
+            root.AssemblyLinearVelocity = moveDir.Unit * Config.FlySpeed
+        else
+            root.AssemblyLinearVelocity = Vector3.zero
         end
-        
-        local targetRoll = 0
-        if inputA == 1 then targetRoll = 12 end
-        if inputD == 1 then targetRoll = -12 end
-        local currentAngles = {Camera.CFrame:ToEulerAnglesYXZ()}
-        local lerpedRoll = math.rad(targetRoll)
-        Camera.CFrame = CFrame.new(Camera.CFrame.Position) * CFrame.Angles(currentAngles[1], currentAngles[2], math.clamp(currentAngles[3] + (lerpedRoll - currentAngles[3]) * 0.1, -math.rad(12), math.rad(12)))
-    else
-        CurrentFlyVelocity = Vector3.zero
-        
-        local rootJoint = char and char:FindFirstChild("HumanoidRootPart") and char.HumanoidRootPart:FindFirstChild("RootJoint") or (char and char:FindFirstChild("LowerTorso") and char.LowerTorso:FindFirstChild("RootJoint"))
-        if rootJoint then
-            rootJoint.C1 = CFrame.new(0, 0, 0) * CFrame.Angles(math.rad(-90), math.rad(180), math.rad(180))
-        end
-        CurrentTiltX = 0
-        CurrentTiltZ = 0
-        CurrentBobbing = 0
     end
     
     if Config.Invisible and DronePosition and root then
