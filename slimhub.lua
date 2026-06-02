@@ -50,9 +50,13 @@ local StartPos = nil
 local DroneNode = nil
 local SavedPosition = nil
 local IsTweeningMin = false
-local LastTrayPos = Vector2.new(0,0)
 
--- Core GUI Setup
+-- Liquid Trailing & Deformation State Variables
+local LastTrayPos = Vector2.new(0,0)
+local DragDistance = 0
+local BaseSize = 50
+
+-- Core GUI Container
 local Gui = Instance.new("ScreenGui")
 Gui.Name = "SlimHub"
 Gui.ResetOnSpawn = false
@@ -138,11 +142,11 @@ ContentArea.BackgroundTransparency = 1
 ContentArea.Parent = MainFrame
 
 -- ====================================================================
--- THE SMOOTH MOVABLE S-TRAY INTERFACE
+-- LIQUID TRAY CONTAINER W/ JIGGLE PHYSICS
 -- ====================================================================
 local TrayBtn = Instance.new("TextButton")
 TrayBtn.Name = "SlimTray"
-TrayBtn.Size = UDim2.fromOffset(0, 0) -- Hidden initially
+TrayBtn.Size = UDim2.fromOffset(0, 0)
 TrayBtn.Position = MainFrame.Position
 TrayBtn.AnchorPoint = Vector2.new(0.5, 0.5)
 TrayBtn.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
@@ -159,23 +163,28 @@ TrayCorner.CornerRadius = UDim.new(1, 0)
 
 local TrayStroke = Instance.new("UIStroke", TrayBtn)
 TrayStroke.Color = Color3.fromRGB(0, 255, 150)
-TrayStroke.Thickness = 2
+TrayStroke.Thickness = 2.5
 
--- Fluid Trail Generator Engine
-local function SpawnTrailNode(position)
+-- Highly Fluid Droplet Trail Function
+local function SpawnLiquidTrail(position, velocity)
+    local sizeFactor = math.clamp(velocity * 1.2, 15, 45)
+    
     local Node = Instance.new("Frame")
-    Node.Size = UDim2.fromOffset(45, 45)
-    Node.Position = position
+    Node.Size = UDim2.fromOffset(sizeFactor, sizeFactor)
+    -- Add slight fluid variation offsets
+    local randomOffset = Vector2.new(math.random(-3, 3), math.random(-3, 3))
+    Node.Position = position + UDim2.fromOffset(randomOffset.X, randomOffset.Y)
     Node.AnchorPoint = Vector2.new(0.5, 0.5)
     Node.BackgroundColor3 = Color3.fromRGB(0, 255, 150)
-    Node.BackgroundTransparency = 0.5
+    Node.BackgroundTransparency = 0.4
     Node.BorderSizePixel = 0
     Node.ZIndex = 9
     Node.Parent = Gui
 
     Instance.new("UICorner", Node).CornerRadius = UDim.new(1, 0)
 
-    local Info = TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    -- Rapid organic collapse animation
+    local Info = TweenInfo.new(0.25, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
     local T = TweenService:Create(Node, Info, {
         Size = UDim2.fromOffset(0, 0),
         BackgroundTransparency = 1
@@ -527,7 +536,7 @@ local SettingsSection = CreateSection(Tabs.Settings, "Keybinds")
 CreateKeybindButton(SettingsSection, "Menu Toggle", "MenuKeybind")
 
 -- ====================================================================
--- THE INTERACTIVE TRAY EXPAND/MINIMIZE TRANSITION HANDLER
+-- SAFE TOGGLE INTERFACE TRANSITION MANAGER
 -- ====================================================================
 local function ToggleMinimize()
     if IsTweeningMin then return end
@@ -539,7 +548,6 @@ local function ToggleMinimize()
     local FadeInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
     
     if Config.IsMinimized then
-        -- Fade Out Main Menu Elements instantly
         MainFrame.ClipsDescendants = true
         local HideMain = TweenService:Create(MainFrame, FadeInfo, {Size = UDim2.fromOffset(0, 0)})
         HideMain:Play()
@@ -547,27 +555,24 @@ local function ToggleMinimize()
         HideMain.Completed:Connect(function()
             MainFrame.Visible = false
             
-            -- Prepare Tray to fluidly erupt from main location
             TrayBtn.Position = MainFrame.Position
             TrayBtn.Size = UDim2.fromOffset(0, 0)
             TrayBtn.Visible = true
             
-            local ShowTray = TweenService:Create(TrayBtn, SpeedInfo, {Size = UDim2.fromOffset(50, 50)})
+            local ShowTray = TweenService:Create(TrayBtn, SpeedInfo, {Size = UDim2.fromOffset(BaseSize, BaseSize)})
             ShowTray:Play()
             ShowTray.Completed:Connect(function()
-                LastTrayPos = Vector2.new(TrayBtn.AbsolutePosition.X + 25, TrayBtn.AbsolutePosition.Y + 25)
+                LastTrayPos = Vector2.new(TrayBtn.AbsolutePosition.X + (BaseSize/2), TrayBtn.AbsolutePosition.Y + (BaseSize/2))
                 IsTweeningMin = false
             end)
         end)
     else
-        -- Shrink Tray back down
         local HideTray = TweenService:Create(TrayBtn, FadeInfo, {Size = UDim2.fromOffset(0, 0)})
         HideTray:Play()
         
         HideTray.Completed:Connect(function()
             TrayBtn.Visible = false
             
-            -- Save layout coordinates derived from floating Tray location
             MainFrame.Position = TrayBtn.Position
             MainFrame.Visible = true
             
@@ -581,12 +586,17 @@ local function ToggleMinimize()
 end
 
 MinBtn.MouseButton1Click:Connect(ToggleMinimize)
-TrayBtn.MouseButton1Click:Connect(ToggleMinimize)
+
+-- Failsafe Click-vs-Drag verification check
+TrayBtn.MouseButton1Click:Connect(function()
+    if DragDistance < 8 then
+        ToggleMinimize()
+    end
+end)
 
 -- ====================================================================
--- INDEPENDENT ZERO-DRIFT DRAG COMPONENT SYSTEM
+-- REBUILT COMPONENT DRAG CONTROLLERS (ZERO-DRIFT)
 -- ====================================================================
--- Handle Main Frame Dragging
 TopBar.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         MainDragging = true
@@ -595,12 +605,12 @@ TopBar.InputBegan:Connect(function(input)
     end
 end)
 
--- Handle Tray Floating Dragging
 TrayBtn.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         TrayDragging = true
         DragStart = input.Position
         StartPos = TrayBtn.Position
+        DragDistance = 0 -- Clear distance calculation tracker on press
     end
 end)
 
@@ -611,6 +621,7 @@ UIS.InputChanged:Connect(function(input)
             MainFrame.Position = UDim2.new(StartPos.X.Scale, StartPos.X.Offset + delta.X, StartPos.Y.Scale, StartPos.Y.Offset + delta.Y)
         elseif TrayDragging then
             local delta = input.Position - DragStart
+            DragDistance = (input.Position - DragStart).Magnitude
             TrayBtn.Position = UDim2.new(StartPos.X.Scale, StartPos.X.Offset + delta.X, StartPos.Y.Scale, StartPos.Y.Offset + delta.Y)
         end
     end
@@ -637,22 +648,40 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
 end)
 
 -- ====================================================================
--- FLUID TRAIL & UTILITY ENGINE RUN LOOPS
+-- PHYSICS ENGINE LOGIC (LIQUID DEFORMATION & FLUID TRAIL)
 -- ====================================================================
 RunService.RenderStepped:Connect(function()
-    -- Fluid Trail generation code when dragged rapidly
     if Config.IsMinimized and TrayBtn.Visible then
-        local currentCenter = Vector2.new(TrayBtn.AbsolutePosition.X + 25, TrayBtn.AbsolutePosition.Y + 25)
-        local travelVelocity = (currentCenter - LastTrayPos).Magnitude
+        local currentCenter = Vector2.new(TrayBtn.AbsolutePosition.X + (BaseSize/2), TrayBtn.AbsolutePosition.Y + (BaseSize/2))
+        local rawVelocity = currentCenter - LastTrayPos
+        local speed = rawVelocity.Magnitude
         
-        -- Only leave a fluid node trail behind if dragging or shifting fast
-        if travelVelocity > 2 then
-            SpawnTrailNode(UDim2.fromOffset(currentCenter.X, currentCenter.Y))
+        if speed > 0.5 then
+            -- 1. Liquid Node Streaming Engine
+            if speed > 2 then
+                SpawnLiquidTrail(UDim2.fromOffset(currentCenter.X, currentCenter.Y), speed)
+            end
+            
+            -- 2. Real-Time Dynamic Liquefying Deformation Math
+            local stretchFactor = math.clamp(1 + (speed / 90), 1, 1.45)
+            local squeezeFactor = math.clamp(1 - (speed / 130), 0.65, 1)
+            
+            -- Match deformation vectors to movement plane coordinates
+            if math.abs(rawVelocity.X) > math.abs(rawVelocity.Y) then
+                TrayBtn.Size = UDim2.fromOffset(BaseSize * stretchFactor, BaseSize * squeezeFactor)
+            else
+                TrayBtn.Size = UDim2.fromOffset(BaseSize * squeezeFactor, BaseSize * stretchFactor)
+            end
+        else
+            -- Soft elastic rebound return to target size when dragging halts
+            TweenService:Create(TrayBtn, TweenInfo.new(0.15, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+                Size = UDim2.fromOffset(BaseSize, BaseSize)
+            }):Play()
         end
         LastTrayPos = currentCenter
     end
 
-    -- Flight Control loop
+    -- Flight control calculations
     if Config.Flying and Player.Character then
         local root = Player.Character:FindFirstChild("HumanoidRootPart")
         if root then
