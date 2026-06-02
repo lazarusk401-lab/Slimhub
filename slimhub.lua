@@ -1,106 +1,3 @@
-task.wait(0.5)
-
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UIS = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local CoreGui = game:GetService("CoreGui")
-
-local Player = Players.LocalPlayer
-local Camera = workspace.CurrentCamera
-
--- Config
-local Config = {
-    Flying = false,
-    Noclip = false,
-    SpeedHack = false,
-    InfiniteJump = false,
-    ClickTP = false,
-    Invisible = false,
-    ESPEnabled = false,
-    ESPTracers = false,
-    ESPNames = true,
-    ESPRainbow = false,
-    SilentAim = false,
-    SilentAimFOV = 150,
-    SilentAimTeamCheck = true,
-    SilentAimWallCheck = false,
-    SilentAimHitbox = "Head",
-    SilentAimSmoothness = 0,
-    FlySpeed = 50,
-    HackSpeed = 100,
-    DroneSpeed = 45,
-    MenuKeybind = Enum.KeyCode.RightShift,
-    FlyKeybind = nil,
-    NoclipKeybind = nil,
-    SpeedKeybind = nil,
-    IsMinimized = false,
-    MenuOpen = true,
-    ActiveTab = "Main"
-}
-
--- State
-local ESPObjects = {}
-local ToggleCallbacks = {}
-local Dragging = false
-local DragOffset = nil
-local TargetPosition = nil
-local DroneNode = nil
-local SavedPosition = nil
-local IsTweening = false
-local BaseSize = 40
-
--- UI
-local Gui = Instance.new("ScreenGui")
-Gui.Name = "SlimHub"
-Gui.ResetOnSpawn = false
-Gui.Parent = CoreGui
-
-local MainFrame = Instance.new("Frame")
-MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.fromOffset(500, 380)
-MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-MainFrame.BackgroundColor3 = Color3.fromRGB(13, 13, 17)
-MainFrame.BorderSizePixel = 0
-MainFrame.ClipsDescendants = true
-MainFrame.Parent = Gui
-
-Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 12)
-
-local Stroke = Instance.new("UIStroke", MainFrame)
-Stroke.Color = Color3.fromRGB(40, 40, 50)
-Stroke.Thickness = 1.5
-
--- Top Bar
-local TopBar = Instance.new("Frame")
-TopBar.Name = "TopBar"
-TopBar.Size = UDim2.new(1, 0, 0, 50)
-TopBar.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
-TopBar.BorderSizePixel = 0
-TopBar.Parent = MainFrame
-
-local Cover = Instance.new("Frame")
-Cover.Size = UDim2.new(1, 0, 0, 15)
-Cover.Position = UDim2.new(0, 0, 1, -15)
-Cover.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
-Cover.BorderSizePixel = 0
-Cover.Parent = TopBar
-
-Instance.new("UICorner", TopBar).CornerRadius = UDim.new(0, 12)
-
-local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, -100, 1, 0)
-Title.Position = UDim2.fromOffset(20, 0)
-Title.BackgroundTransparency = 1
-Title.Text = "SLIMHUB // PREMIUM"
-Title.Font = Enum.Font.GothamBold
-Title.TextSize = 16
-Title.TextColor3 = Color3.fromRGB(0, 255, 150)
-Title.TextXAlignment = Enum.TextXAlignment.Left
-Title.Parent = TopBar
-
 -- Minimize Button
 local MinBtn = Instance.new("TextButton")
 MinBtn.Name = "MinBtn"
@@ -163,6 +60,11 @@ TrayLabel.TextSize = 16
 TrayLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
 TrayLabel.ZIndex = 11
 TrayLabel.Parent = TrayBtn
+
+-- New State Variables for Tray Dragging
+local TrayDragging = false
+local TrayDragOffset = nil
+local TrayTargetPosition = nil
 
 -- Tabs
 local Tabs = {}
@@ -344,7 +246,6 @@ local function CreateToggle(parent, text, configKey, callback)
     ToggleCallbacks[configKey] = Update
 end
 
--- SLIDER WITH HOVER & HOVER SCALE INTERACTION PRESERVED
 local function CreateSlider(parent, text, configKey, min, max, callback)
     local Row = Instance.new("Frame")
     Row.Size = UDim2.new(1, 0, 0, 50)
@@ -804,12 +705,16 @@ for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
     end
 end
 
--- Transition Engine (Stroke Thickness Animate Built In to Fix Minimizing Glitch)
+-- Transition Engine
 local function ToggleUI()
     if IsTweening then return end
     IsTweening = true
-    Config.IsMinimized = not Config.IsMinimized
     
+    -- Terminate active dragging before states flip
+    Dragging = false
+    TrayDragging = false
+    
+    Config.IsMinimized = not Config.IsMinimized
     local speedInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
     
     if Config.IsMinimized then
@@ -817,7 +722,7 @@ local function ToggleUI()
         
         local hideMain = TweenService:Create(MainFrame, speedInfo, {
             Size = UDim2.fromOffset(0, 0),
-            Position = UDim2.new(1, -60, 1, -60)
+            Position = TrayBtn.Position -- Shrinks precisely to wherever the tray last moved!
         })
         hideMain:Play()
         hideMain.Completed:Connect(function()
@@ -842,7 +747,7 @@ local function ToggleUI()
             
             local showMain = TweenService:Create(MainFrame, speedInfo, {
                 Size = UDim2.fromOffset(500, 380),
-                Position = UDim2.new(0.5, 0, 0.5, 0)
+                Position = TrayBtn.Position -- Main frame expands outward directly from the tray's custom position!
             })
             showMain:Play()
             showMain.Completed:Connect(function()
@@ -854,7 +759,26 @@ end
 
 -- Action Connections
 MinBtn.MouseButton1Click:Connect(ToggleUI)
-TrayBtn.MouseButton1Click:Connect(ToggleUI)
+
+-- Tray Click Handling with Drag Detection 
+local DraggedFar = false
+TrayBtn.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        TrayDragging = true
+        DraggedFar = false
+        TrayDragOffset = input.Position - TrayBtn.AbsolutePosition
+    end
+end)
+
+TrayBtn.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        TrayDragging = false
+        -- If the user just clicked it without dragging it across the screen, trigger open/close!
+        if not DraggedFar then
+            ToggleUI()
+        end
+    end
+end)
 
 -- Drag Top Bar Mechanics
 TopBar.InputBegan:Connect(function(input)
@@ -866,8 +790,19 @@ end)
 
 UIS.InputChanged:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        -- Process Main Frame Dragging
         if Dragging and not Config.IsMinimized then
-            TargetPosition = UDim2.fromOffset(input.Position.X - DragOffset.X + (MainFrame.AbsoluteSize.X * MainFrame.AnchorPoint.X), input.Position.Y - DragOffset.Y + (MainFrame.AbsoluteSize.Y * MainFrame.AnchorPoint.Y))
+            TargetPosition = UDim2.fromOffset(
+                input.Position.X - DragOffset.X + (MainFrame.AbsoluteSize.X * MainFrame.AnchorPoint.X), 
+                input.Position.Y - DragOffset.Y + (MainFrame.AbsoluteSize.Y * MainFrame.AnchorPoint.Y)
+            )
+        -- Process Tray Button Dragging
+        elseif TrayDragging and Config.IsMinimized then
+            DraggedFar = true
+            TrayTargetPosition = UDim2.fromOffset(
+                input.Position.X - TrayDragOffset.X + (TrayBtn.AbsoluteSize.X * TrayBtn.AnchorPoint.X),
+                input.Position.Y - TrayDragOffset.Y + (TrayBtn.AbsoluteSize.Y * TrayBtn.AnchorPoint.Y)
+            )
         end
     end
 end)
@@ -922,8 +857,8 @@ end)
 
 -- Main Frame Loop Engine
 RunService.RenderStepped:Connect(function()
-    -- Smooth dragging integration
-    if Dragging and TargetPosition then
+    -- Smooth Main Frame dragging integration
+    if Dragging and TargetPosition and not Config.IsMinimized then
         local current = MainFrame.Position
         local target = TargetPosition
         local smooth = UDim2.new(
@@ -933,6 +868,19 @@ RunService.RenderStepped:Connect(function()
             current.Y.Offset + (target.Y.Offset - current.Y.Offset) * 0.3
         )
         MainFrame.Position = smooth
+    end
+    
+    -- Smooth Tray Button dragging integration
+    if TrayDragging and TrayTargetPosition and Config.IsMinimized then
+        local current = TrayBtn.Position
+        local target = TrayTargetPosition
+        local smooth = UDim2.new(
+            current.X.Scale,
+            current.X.Offset + (target.X.Offset - current.X.Offset) * 0.35,
+            current.Y.Scale,
+            current.Y.Offset + (target.Y.Offset - current.Y.Offset) * 0.35
+        )
+        TrayBtn.Position = smooth
     end
     
     -- Fly logic execution
@@ -975,86 +923,6 @@ RunService.RenderStepped:Connect(function()
                 target = Vector3.new(target.X, SavedPosition.Position.Y + 2, target.Z)
             end
             DroneNode.Position = DroneNode.Position:Lerp(target, 0.5)
-        end
-    end
-end)
-
--- Noclip Physics Loop
-RunService.Stepped:Connect(function()
-    if Config.Noclip then
-        local char = Player.Character
-        if char then
-            for _, part in ipairs(char:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    part.CanCollide = false
-                end
-            end
-        end
-    end
-end)
-
--- Visuals / ESP / FOV Render Loop
-RunService.RenderStepped:Connect(function()
-    local rainbowColor = Color3.fromHSV((tick() * 0.5) % 1, 1, 1)
-    local espColor = Config.ESPRainbow and rainbowColor or Color3.fromRGB(0, 255, 150)
-    
-    FOVCircle.Visible = Config.SilentAim and Config.MenuOpen and not Config.IsMinimized
-    FOVCircle.Position = UIS:GetMouseLocation()
-    FOVCircle.Radius = Config.SilentAimFOV
-    FOVCircle.Color = espColor
-    
-    for p, drawings in pairs(ESPObjects) do
-        if Config.ESPEnabled and p.Character then
-            local char = p.Character
-            local root = char:FindFirstChild("HumanoidRootPart")
-            local humanoid = char:FindFirstChildOfClass("Humanoid")
-            
-            if root and humanoid and humanoid.Health > 0 then
-                local pos, onScreen = Camera:WorldToViewportPoint(root.Position)
-                
-                if onScreen then
-                    local sizeY = math.abs(Camera:WorldToViewportPoint(root.Position + Vector3.new(0, 3, 0)).Y - Camera:WorldToViewportPoint(root.Position - Vector3.new(0, 3, 0)).Y)
-                    local sizeX = sizeY * 0.6
-                    
-                    drawings.Box.Size = Vector2.new(sizeX, sizeY)
-                    drawings.Box.Position = Vector2.new(pos.X - sizeX/2, pos.Y - sizeY/2)
-                    drawings.Box.Color = espColor
-                    drawings.Box.Visible = true
-                    
-                    drawings.Name.Text = p.Name
-                    drawings.Name.Position = Vector2.new(pos.X, pos.Y - sizeY/2 - 15)
-                    drawings.Name.Color = espColor
-                    drawings.Name.Visible = Config.ESPNames
-                    
-                    if Config.ESPTracers then
-                        local localChar = Player.Character
-                        if localChar then
-                            local localRoot = localChar:FindFirstChild("HumanoidRootPart")
-                            if localRoot then
-                                local myPos = Camera:WorldToViewportPoint(localRoot.Position)
-                                drawings.Tracer.From = Vector2.new(myPos.X, myPos.Y)
-                                drawings.Tracer.To = Vector2.new(pos.X, pos.Y)
-                                drawings.Tracer.Color = espColor
-                                drawings.Tracer.Visible = true
-                            end
-                        end
-                    else
-                        drawings.Tracer.Visible = false
-                    end
-                else
-                    drawings.Box.Visible = false
-                    drawings.Name.Visible = false
-                    drawings.Tracer.Visible = false
-                end
-            else
-                drawings.Box.Visible = false
-                drawings.Name.Visible = false
-                drawings.Tracer.Visible = false
-            end
-        else
-            drawings.Box.Visible = false
-            drawings.Name.Visible = false
-            drawings.Tracer.Visible = false
         end
     end
 end)
