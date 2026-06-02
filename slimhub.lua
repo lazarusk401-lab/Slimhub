@@ -6,6 +6,7 @@ local UIS = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CoreGui = game:GetService("CoreGui")
+local GuiService = game:GetService("GuiService")
 
 local Player = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
@@ -745,13 +746,16 @@ for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
     end
 end
 
--- Dragging Listeners (Fixed Mouse Coordinate Offset)
+-- Dragging Listeners (100% Fixed TopBar Inset & Window Drift)
 TopBar.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         Dragging = true
         
-        local initialMousePos = Vector2.new(input.Position.X, input.Position.Y)
-        DragOffset = Vector2.new(initialMousePos.X - MainFrame.AbsolutePosition.X, initialMousePos.Y - MainFrame.AbsolutePosition.Y)
+        local mousePos = UIS:GetMouseLocation()
+        local inset = GuiService:GetGuiInset()
+        local adjustedMouse = Vector2.new(mousePos.X, mousePos.Y - inset.Y)
+        
+        DragOffset = Vector2.new(adjustedMouse.X - MainFrame.AbsolutePosition.X, adjustedMouse.Y - MainFrame.AbsolutePosition.Y)
         
         input.Changed:Connect(function()
             if input.UserInputState == Enum.UserInputState.End then
@@ -763,12 +767,15 @@ end)
 
 UIS.InputChanged:Connect(function(input)
     if Dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-        local currentMousePos = Vector2.new(input.Position.X, input.Position.Y)
+        local mousePos = UIS:GetMouseLocation()
+        local inset = GuiService:GetGuiInset()
+        local adjustedMouse = Vector2.new(mousePos.X, mousePos.Y - inset.Y)
+        
         TargetPosition = UDim2.new(
             MainFrame.Position.X.Scale,
-            currentMousePos.X - DragOffset.X + (MainFrame.Size.X.Offset * MainFrame.AnchorPoint.X),
+            adjustedMouse.X - DragOffset.X + (MainFrame.Size.X.Offset * MainFrame.AnchorPoint.X),
             MainFrame.Position.Y.Scale,
-            currentMousePos.Y - DragOffset.Y + (MainFrame.Size.Y.Offset * MainFrame.AnchorPoint.Y)
+            adjustedMouse.Y - DragOffset.Y + (MainFrame.Size.Y.Offset * MainFrame.AnchorPoint.Y)
         )
     end
 end)
