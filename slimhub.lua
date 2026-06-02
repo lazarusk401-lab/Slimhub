@@ -26,16 +26,20 @@ local MenuPositionBeforeMinimize = UDim2.new(0.5, 0, 0.5, 0)
 local ShootRemotes = {}
 local CurrentFlyVelocity = Vector3.zero
 
--- Smooth Animation State Tracking
 local CurrentTiltX = 0
 local CurrentTiltZ = 0
 local CurrentBobbing = 0
 
--- UI Setup
 local Gui = Instance.new("ScreenGui")
 Gui.Name = "SlimHub"
 Gui.ResetOnSpawn = false
-Gui.Parent = CoreGui
+
+local Success, Error = pcall(function()
+    Gui.Parent = CoreGui
+end)
+if not Success then
+    Gui.Parent = Player:WaitForChild("PlayerGui")
+end
 
 local MainFrame = Instance.new("Frame", Gui)
 MainFrame.Name = "MainFrame"
@@ -68,7 +72,6 @@ Title.TextSize = 16
 Title.TextColor3 = Color3.fromRGB(0, 255, 150)
 Title.TextXAlignment = Enum.TextXAlignment.Left
 
--- DRAG
 local Dragging, DragOffset = false, Vector2.zero
 TopBar.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -97,7 +100,6 @@ ContentArea.Size = UDim2.new(1, -145, 1, -65)
 ContentArea.Position = UDim2.fromOffset(140, 60)
 ContentArea.BackgroundTransparency = 1
 
--- Minimized Icon
 local MinimizedIcon = Instance.new("TextButton", Gui)
 MinimizedIcon.Name = "MinimizedIcon"
 MinimizedIcon.Size = UDim2.fromOffset(45, 45)
@@ -166,7 +168,6 @@ end
 MinBtn.MouseButton1Click:Connect(MinimizeMenu)
 MinimizedIcon.MouseButton1Click:Connect(MaximizeMenu)
 
--- Tabs & UI Elements
 local Tabs = {}
 local function CreateTab(name)
     local Tab = Instance.new("ScrollingFrame", ContentArea)
@@ -386,7 +387,6 @@ local function CreateKeybindButton(parent, text, configKey, callback)
     end)
 end
 
--- Menus
 local MainSection = CreateSection(Tabs.Main, "Movement")
 CreateToggle(MainSection, "Fly", "Flying")
 CreateSlider(MainSection, "Fly Speed", "FlySpeed", 16, 250)
@@ -429,7 +429,6 @@ CreateToggle(MainSection, "Invisibility", "Invisible", function(state)
 end)
 CreateToggle(MainSection, "Infinite Jump", "InfiniteJump")
 
--- Infinite Jump Logic
 UIS.InputBegan:Connect(function(input, gameProcessed)
     if not gameProcessed and Config.InfiniteJump and input.KeyCode == Enum.KeyCode.Space then
         local char = Player.Character
@@ -471,7 +470,6 @@ CreateKeybindButton(SettingsSection, "Fly Toggle", "FlyKeybind")
 CreateKeybindButton(SettingsSection, "Noclip Toggle", "NoclipKeybind")
 CreateKeybindButton(SettingsSection, "Speed Toggle", "SpeedKeybind")
 
--- ESP Creation
 local function CreateESP(player)
     if ESPObjects[player] then return end
     local box = Drawing.new("Square"); box.Thickness = 1; box.Color = Color3.fromRGB(0, 255, 150); box.Filled = false; box.Visible = false
@@ -480,7 +478,6 @@ local function CreateESP(player)
     ESPObjects[player] = {Box = box, Name = name, Tracer = tracer}
 end
 
--- KEYBINDS & MENU TOGGLE
 UIS.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     if Config.MenuKeybind and input.KeyCode == Config.MenuKeybind then
@@ -512,7 +509,6 @@ end)
 local FOVCircle = Drawing.new("Circle"); FOVCircle.Visible = false; FOVCircle.Thickness = 1.5
 FOVCircle.Color = Color3.fromRGB(0, 255, 150); FOVCircle.Filled = false; FOVCircle.NumSides = 64
 
--- SILENT AIM
 local function GetTarget()
     local mousePos = UIS:GetMouseLocation()
     local closest = nil
@@ -619,12 +615,10 @@ if hookmetamethod then
     end)
 end
 
--- LOOPS
 RunService.RenderStepped:Connect(function()
     local char = Player.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     
-    -- Smooth Fly Logic with Procedural Character Animations
     if Config.Flying and root then
         local moveDir = Vector3.zero
         local inputW = UIS:IsKeyDown(Enum.KeyCode.W) and 1 or 0
@@ -645,12 +639,10 @@ RunService.RenderStepped:Connect(function()
         CurrentFlyVelocity = CurrentFlyVelocity:Lerp(targetVelocity, 0.1)
         root.AssemblyLinearVelocity = CurrentFlyVelocity
         
-        -- Procedural Character Animation (Swaying, Bobbing, Tilting)
         local rootJoint = root:FindFirstChild("RootJoint") or (char and char:FindFirstChild("LowerTorso") and char.LowerTorso:FindFirstChild("RootJoint"))
         if rootJoint then
             local currentSpeed = CurrentFlyVelocity.Magnitude
             
-            -- Dynamic targets based on flight direction and speed
             local targetTiltX = 0
             local targetTiltZ = 0
             
@@ -660,19 +652,15 @@ RunService.RenderStepped:Connect(function()
                 targetTiltZ = math.clamp(-localVelocity.X / Config.FlySpeed * 0.3, -0.3, 0.3)
             end
             
-            -- Continuous idle breathing/floating bob effect
             CurrentBobbing = math.sin(tick() * 3) * 0.08
             
-            -- Smoothed interpolation for transitions
             CurrentTiltX = math.clamp(CurrentTiltX + (targetTiltX - CurrentTiltX) * 0.1, -0.5, 0.5)
             CurrentTiltZ = math.clamp(CurrentTiltZ + (targetTiltZ - CurrentTiltZ) * 0.1, -0.4, 0.4)
             
-            -- Apply transformations safely to the joint C1 property
             rootJoint.C1 = CFrame.new(0, CurrentBobbing, 0) 
                 * CFrame.Angles(math.rad(-90) + CurrentTiltX, math.rad(180), math.rad(180) + CurrentTiltZ)
         end
         
-        -- Camera Banking
         local targetRoll = 0
         if inputA == 1 then targetRoll = 12 end
         if inputD == 1 then targetRoll = -12 end
@@ -682,7 +670,6 @@ RunService.RenderStepped:Connect(function()
     else
         CurrentFlyVelocity = Vector3.zero
         
-        -- Restore original joint orientations cleanly when flying is disabled
         local rootJoint = char and char:FindFirstChild("HumanoidRootPart") and char.HumanoidRootPart:FindFirstChild("RootJoint") or (char and char:FindFirstChild("LowerTorso") and char.LowerTorso:FindFirstChild("RootJoint"))
         if rootJoint then
             rootJoint.C1 = CFrame.new(0, 0, 0) * CFrame.Angles(math.rad(-90), math.rad(180), math.rad(180))
@@ -692,7 +679,6 @@ RunService.RenderStepped:Connect(function()
         CurrentBobbing = 0
     end
     
-    -- Invisible Movement
     if Config.Invisible and DronePosition and root then
         local moveDir = Vector3.zero
         if UIS:IsKeyDown(Enum.KeyCode.W) then moveDir += Camera.CFrame.LookVector end
