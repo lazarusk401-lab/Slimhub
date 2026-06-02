@@ -51,7 +51,7 @@ local DroneNode = nil
 local SavedPosition = nil
 local IsTweeningMin = false
 
--- UI
+-- UI Setup
 local Gui = Instance.new("ScreenGui")
 Gui.Name = "SlimHub"
 Gui.ResetOnSpawn = false
@@ -60,8 +60,13 @@ Gui.Parent = CoreGui
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
 MainFrame.Size = UDim2.fromOffset(500, 380)
-MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+
+-- Set AnchorPoint to 0,0 to prevent math drift during sizing/dragging changes
+MainFrame.AnchorPoint = Vector2.new(0, 0)
+-- Compute perfect screen centering manually using pixel offsets instead of scale
+local viewportSize = Camera.ViewportSize
+MainFrame.Position = UDim2.fromOffset((viewportSize.X / 2) - 250, (viewportSize.Y / 2) - 190)
+
 MainFrame.BackgroundColor3 = Color3.fromRGB(13, 13, 17)
 MainFrame.BorderSizePixel = 0
 MainFrame.ClipsDescendants = true
@@ -127,14 +132,14 @@ Sidebar.Parent = MainFrame
 local TabList = Instance.new("UIListLayout", Sidebar)
 TabList.Padding = UDim.new(0, 4)
 
--- Content
+-- Content Area
 local ContentArea = Instance.new("Frame")
 ContentArea.Size = UDim2.new(1, -145, 1, -65)
 ContentArea.Position = UDim2.fromOffset(140, 60)
 ContentArea.BackgroundTransparency = 1
 ContentArea.Parent = MainFrame
 
--- Tabs
+-- Tabs creation
 local Tabs = {}
 local function CreateTab(name)
     local Tab = Instance.new("ScrollingFrame")
@@ -215,7 +220,7 @@ CreateTabButton("ESP")
 CreateTabButton("Prison")
 CreateTabButton("Settings")
 
--- Components
+-- Component Helpers
 local function CreateSection(parent, title)
     local Section = Instance.new("Frame")
     Section.Size = UDim2.new(1, -10, 0, 0)
@@ -748,55 +753,64 @@ for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
     end
 end
 
--- Smooth Minimize Action Toggle Engine
+-- Completely Overhauled Smooth Minimize Engine (Failsafe Vector Layouts)
 local function ToggleMinimize()
     if IsTweeningMin then return end
     IsTweeningMin = true
     
     Config.IsMinimized = not Config.IsMinimized
     
-    local Info = TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-    local TargetSize, TargetCorner
+    local Info = TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
     
     if Config.IsMinimized then
-        -- Hide items instantly so they don't leak out of the circle boundary
+        -- Hide interior nodes instantly so clipping borders look sharp
         Sidebar.Visible = false
         ContentArea.Visible = false
         Cover.Visible = false
         Title.Visible = false
+        
+        -- Lock Topbar sizing dynamically during size change sequence
+        TopBar.Size = UDim2.new(0, 50, 0, 50)
+        MinBtn.Position = UDim2.new(0, 10, 0, 10)
         MinBtn.Text = "+"
         
-        TargetSize = UDim2.fromOffset(50, 50)
-        TargetCorner = UDim.new(1, 0) -- Circle corner
+        local SizeTween = TweenService:Create(MainFrame, Info, {Size = UDim2.fromOffset(50, 50)})
+        local CornerTween = TweenService:Create(MainCorner, Info, {CornerRadius = UDim.new(1, 0)})
+        
+        SizeTween:Play()
+        CornerTween:Play()
+        
+        SizeTween.Completed:Connect(function()
+            IsTweeningMin = false
+        end)
     else
-        TargetSize = UDim2.fromOffset(500, 380)
-        TargetCorner = UDim.new(0, 12) -- Standard box corner
         MinBtn.Text = "-"
-    end
-    
-    local SizeTween = TweenService:Create(MainFrame, Info, {Size = TargetSize})
-    local CornerTween = TweenService:Create(MainCorner, Info, {CornerRadius = TargetCorner})
-    
-    SizeTween:Play()
-    CornerTween:Play()
-    
-    SizeTween.Completed:Connect(function()
-        if not Config.IsMinimized then
-            -- Unhide components smoothly once open
+        
+        local SizeTween = TweenService:Create(MainFrame, Info, {Size = UDim2.fromOffset(500, 380)})
+        local CornerTween = TweenService:Create(MainCorner, Info, {CornerRadius = UDim.new(0, 12)})
+        
+        SizeTween:Play()
+        CornerTween:Play()
+        
+        SizeTween.Completed:Connect(function()
+            -- Restore layout configurations safely
+            TopBar.Size = UDim2.new(1, 0, 0, 50)
+            MinBtn.Position = UDim2.new(1, -45, 0.5, -15)
+            
             Sidebar.Visible = true
             ContentArea.Visible = true
             Cover.Visible = true
             Title.Visible = true
-        end
-        IsTweeningMin = false
-    end)
+            IsTweeningMin = false
+        end)
+    end
 end
 
 MinBtn.MouseButton1Click:Connect(ToggleMinimize)
 
--- Rock Solid Pure Offset Dragging System (No Scale Drift)
+-- Pure Anchor-Safe Offset Dragging System
 TopBar.InputBegan:Connect(function(input)
-    if Config.IsMinimized then return end -- Guard dragging if minimized
+    if Config.IsMinimized then return end
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         Dragging = true
         DragStart = input.Position
@@ -813,16 +827,14 @@ end)
 UIS.InputChanged:Connect(function(input)
     if Dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
         local delta = input.Position - DragStart
-        MainFrame.Position = UDim2.new(
-            StartPos.X.Scale, 
+        MainFrame.Position = UDim2.fromOffset(
             StartPos.X.Offset + delta.X, 
-            StartPos.Y.Scale, 
             StartPos.Y.Offset + delta.Y
         )
     end
 end)
 
--- Global Menu Keybind Listener
+-- Global Menu Toggle Keybind
 UIS.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     if Config.MenuKeybind and input.KeyCode == Config.MenuKeybind then
@@ -831,9 +843,8 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
--- Loops
+-- Core Service Execution Loops
 RunService.RenderStepped:Connect(function()
-    -- Fly execution
     if Config.Flying then
         local char = Player.Character
         if char then
@@ -856,7 +867,6 @@ RunService.RenderStepped:Connect(function()
         end
     end
     
-    -- Drone movement for invis
     if Config.Invisible and DroneNode then
         local move = Vector3.zero
         if UIS:IsKeyDown(Enum.KeyCode.W) then move += Camera.CFrame.LookVector end
@@ -890,7 +900,7 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- ESP Rendering Loop
+-- Global ESP Drawing Thread
 RunService.RenderStepped:Connect(function()
     local rainbowColor = Color3.fromHSV((tick() * 0.5) % 1, 1, 1)
     local espColor = Config.ESPRainbow and rainbowColor or Color3.fromRGB(0, 255, 150)
