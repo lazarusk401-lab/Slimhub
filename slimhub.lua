@@ -130,7 +130,6 @@ local function MaximizeMenu()
 if not Config.IsMinimized then return end
 Config.IsMinimized = false
 
-```
 local iconTween = TweenService:Create(MinimizedIcon, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {
     Size = UDim2.fromOffset(0, 0)
 })
@@ -145,8 +144,6 @@ MainFrame.Position = UDim2.new(1, -37.5, 1, -37.5)
 TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
     Size = UDim2.fromOffset(500, 380), Position = MenuPositionBeforeMinimize
 }):Play()
-
-```
 
 end
 
@@ -172,7 +169,6 @@ Btn.Size = UDim2.new(1, -10, 0, 40); Btn.Position = UDim2.fromOffset(5, 0)
 Btn.BackgroundColor3 = name == "Main" and Color3.fromRGB(28, 28, 36) or Color3.fromRGB(15, 15, 19)
 Btn.Text = ""; Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 10)
 
-```
 local Indicator = Instance.new("Frame", Btn)
 Indicator.Size = UDim2.new(0, 3, 0.5, 0); Indicator.Position = UDim2.fromOffset(8, 0.25)
 Indicator.BackgroundColor3 = Color3.fromRGB(0, 255, 150); Indicator.BorderSizePixel = 0
@@ -197,8 +193,6 @@ Btn.MouseButton1Click:Connect(function()
     end
 end)
 
-```
-
 end
 CreateTabButton("Main"); CreateTabButton("ESP"); CreateTabButton("Prison"); CreateTabButton("Settings")
 
@@ -209,7 +203,6 @@ Section.BackgroundColor3 = Color3.fromRGB(20, 20, 26); Section.BorderSizePixel =
 Instance.new("UICorner", Section).CornerRadius = UDim.new(0, 10)
 Instance.new("UIStroke", Section).Color = Color3.fromRGB(35, 35, 45)
 
-```
 local TitleLabel = Instance.new("TextLabel", Section)
 TitleLabel.Size = UDim2.new(1, -20, 0, 28); TitleLabel.Position = UDim2.fromOffset(15, 8)
 TitleLabel.BackgroundTransparency = 1; TitleLabel.Text = title:upper()
@@ -224,8 +217,6 @@ local Pad = Instance.new("UIPadding", Content)
 Pad.PaddingLeft = UDim.new(0, 15); Pad.PaddingRight = UDim.new(0, 15); Pad.PaddingBottom = UDim.new(0, 15)
 return Content
 
-```
-
 end
 
 local function CreateToggle(parent, text, configKey, callback)
@@ -236,7 +227,6 @@ Label.Size = UDim2.new(1, -70, 1, 0); Label.BackgroundTransparency = 1; Label.Te
 Label.Font = Enum.Font.Gotham; Label.TextSize = 13; Label.TextColor3 = Color3.fromRGB(220, 220, 230)
 Label.TextXAlignment = Enum.TextXAlignment.Left
 
-```
 local ToggleBtn = Instance.new("TextButton", Row)
 ToggleBtn.Size = UDim2.fromOffset(48, 24); ToggleBtn.Position = UDim2.new(1, -48, 0.5, -12)
 ToggleBtn.BackgroundColor3 = Config[configKey] and Color3.fromRGB(0, 255, 150) or Color3.fromRGB(35, 35, 45)
@@ -256,8 +246,6 @@ local function Update(state)
 end
 ToggleBtn.MouseButton1Click:Connect(function() Update(not Config[configKey]) end)
 ToggleCallbacks[configKey] = Update
-
-```
 
 end
 
@@ -290,7 +278,6 @@ Knob.Position = UDim2.new((Config[configKey] - min) / (max - min), -7, 0.5, -7)
 Knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255); Knob.BorderSizePixel = 0
 Instance.new("UICorner", Knob).CornerRadius = UDim.new(1, 0)
 
-```
 local Holding = false
 local function Update(input)
     local pos = math.clamp((input.Position.X - Track.AbsolutePosition.X) / Track.AbsoluteSize.X, 0, 1)
@@ -301,8 +288,6 @@ end
 HitArea.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then Holding = true; Update(input) end end)
 UIS.InputChanged:Connect(function(input) if Holding and input.UserInputType == Enum.UserInputType.MouseMovement then Update(input) end end)
 UIS.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 and Holding then Holding = false end end)
-
-```
 
 end
 
@@ -321,7 +306,6 @@ BindBtn.Font = Enum.Font.Code; BindBtn.TextSize = 12
 BindBtn.TextColor3 = Config[configKey] and Color3.fromRGB(0, 255, 150) or Color3.fromRGB(140, 140, 150)
 Instance.new("UICorner", BindBtn).CornerRadius = UDim.new(0, 6)
 
-```
 local Listening = false
 BindBtn.MouseButton1Click:Connect(function()
     Listening = true; BindBtn.Text = "[PRESS KEY]"; BindBtn.TextColor3 = Color3.fromRGB(255, 150, 0)
@@ -338,8 +322,6 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
         if callback then callback(Config[configKey]) end
     end
 end)
-
-```
 
 end
 
@@ -475,7 +457,6 @@ local mousePos = UIS:GetMouseLocation()
 local closest = nil
 local closestDist = Config.SilentAimFOV
 
-```
 for _, targetPlayer in ipairs(Players:GetPlayers()) do
     if targetPlayer ~= Player and targetPlayer.Character then
         if Config.SilentAimTeamCheck and targetPlayer.Team == Player.Team then continue end
@@ -515,8 +496,6 @@ for _, targetPlayer in ipairs(Players:GetPlayers()) do
 end
 return closest
 
-```
-
 end
 
 -- UNIVERSAL SILENT AIM
@@ -539,7 +518,6 @@ local function ModifyArgs(args)
 local target = GetTarget()
 if not target then return args end
 
-```
 local camPos = Camera.CFrame.Position
 local targetPos = target.Position
 
@@ -571,8 +549,6 @@ end
 
 return newArgs
 
-```
-
 end
 
 if hookmetamethod then
@@ -591,7 +567,6 @@ RunService.RenderStepped:Connect(function()
 local char = Player.Character
 local root = char and char:FindFirstChild("HumanoidRootPart")
 
-```
 -- Smooth Fly Logic with Procedural Character Animations
 if Config.Flying and root then
     local moveDir = Vector3.zero
@@ -674,8 +649,6 @@ if Config.Invisible and DronePosition and root then
     root.CFrame = CFrame.new(DronePosition.X, DronePosition.Y - 100, DronePosition.Z)
 end
 
-```
-
 end)
 
 RunService.Stepped:Connect(function()
@@ -691,7 +664,6 @@ local espColor = Config.ESPRainbow and Color3.fromHSV((tick() * 0.5) % 1, 1, 1) 
 FOVCircle.Visible = Config.SilentAim; FOVCircle.Position = UIS:GetMouseLocation()
 FOVCircle.Radius = Config.SilentAimFOV; FOVCircle.Color = espColor
 
-```
 for p, drawings in pairs(ESPObjects) do
     if Config.ESPEnabled and p.Character then
         local root = p.Character:FindFirstChild("HumanoidRootPart")
@@ -743,7 +715,5 @@ for p, drawings in pairs(ESPObjects) do
         drawings.Tracer.Visible = false
     end
 end
-
-```
 
 end)
