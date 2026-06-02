@@ -45,8 +45,8 @@ local Config = {
 local ESPObjects = {}
 local ToggleCallbacks = {}
 local Dragging = false
-local DragOffset = nil
-local TargetPosition = nil
+local DragStart = nil
+local StartPos = nil
 local DroneNode = nil
 local SavedPosition = nil
 
@@ -746,16 +746,12 @@ for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
     end
 end
 
--- Dragging Listeners (100% Fixed TopBar Inset & Window Drift)
+-- Completely Rewritten Dragging Engine (No Lerping, Locked delta scaling)
 TopBar.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         Dragging = true
-        
-        local mousePos = UIS:GetMouseLocation()
-        local inset = GuiService:GetGuiInset()
-        local adjustedMouse = Vector2.new(mousePos.X, mousePos.Y - inset.Y)
-        
-        DragOffset = Vector2.new(adjustedMouse.X - MainFrame.AbsolutePosition.X, adjustedMouse.Y - MainFrame.AbsolutePosition.Y)
+        DragStart = input.Position
+        StartPos = MainFrame.Position
         
         input.Changed:Connect(function()
             if input.UserInputState == Enum.UserInputState.End then
@@ -767,34 +763,19 @@ end)
 
 UIS.InputChanged:Connect(function(input)
     if Dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-        local mousePos = UIS:GetMouseLocation()
-        local inset = GuiService:GetGuiInset()
-        local adjustedMouse = Vector2.new(mousePos.X, mousePos.Y - inset.Y)
-        
-        TargetPosition = UDim2.new(
-            MainFrame.Position.X.Scale,
-            adjustedMouse.X - DragOffset.X + (MainFrame.Size.X.Offset * MainFrame.AnchorPoint.X),
-            MainFrame.Position.Y.Scale,
-            adjustedMouse.Y - DragOffset.Y + (MainFrame.Size.Y.Offset * MainFrame.AnchorPoint.Y)
+        local delta = input.Position - DragStart
+        -- Instantly sets the offset directly relative to frame's anchor math
+        MainFrame.Position = UDim2.new(
+            StartPos.X.Scale, 
+            StartPos.X.Offset + delta.X, 
+            StartPos.Y.Scale, 
+            StartPos.Y.Offset + delta.Y
         )
     end
 end)
 
 -- Loops
 RunService.RenderStepped:Connect(function()
-    -- Smooth dragging execution
-    if Dragging and TargetPosition then
-        local current = MainFrame.Position
-        local target = TargetPosition
-        local smooth = UDim2.new(
-            current.X.Scale,
-            current.X.Offset + (target.X.Offset - current.X.Offset) * 0.3,
-            current.Y.Scale,
-            current.Y.Offset + (target.Y.Offset - current.Y.Offset) * 0.3
-        )
-        MainFrame.Position = smooth
-    end
-    
     -- Fly execution
     if Config.Flying then
         local char = Player.Character
