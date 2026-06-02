@@ -177,7 +177,7 @@ local function CreateTabButton(name)
     
     TabButtons[name] = {Btn = Btn, Indicator = Indicator, Label = Label}
     Btn.MouseButton1Click:Connect(function()
-        Config.ActiveTab = name
+        Config.ActiveTab = n
         for n, t in pairs(Tabs) do t.Visible = n == name end
         for n, data in pairs(TabButtons) do
             local active = n == name
@@ -268,7 +268,7 @@ local function CreateSlider(parent, text, configKey, min, max, callback)
     Knob.Position = UDim2.new((Config[configKey] - min) / (max - min), -7, 0.5, -7)
     Knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255); Knob.BorderSizePixel = 0
     Instance.new("UICorner", Knob).CornerRadius = UDim.new(1, 0)
-    
+
     local Holding = false
     local function Update(input)
         local pos = math.clamp((input.Position.X - Track.AbsolutePosition.X) / Track.AbsoluteSize.X, 0, 1)
@@ -295,7 +295,7 @@ local function CreateKeybindButton(parent, text, configKey, callback)
     BindBtn.Font = Enum.Font.Code; BindBtn.TextSize = 12
     BindBtn.TextColor3 = Config[configKey] and Color3.fromRGB(0, 255, 150) or Color3.fromRGB(140, 140, 150)
     Instance.new("UICorner", BindBtn).CornerRadius = UDim.new(0, 6)
-    
+
     local Listening = false
     BindBtn.MouseButton1Click:Connect(function()
         Listening = true; BindBtn.Text = "[PRESS KEY]"; BindBtn.TextColor3 = Color3.fromRGB(255, 150, 0)
@@ -446,7 +446,21 @@ local function GetTarget()
                     if onScreen then
                         local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
                         
-                        -- WALLBANG: Always allow through walls (removed the raycast check entirely)
+                        -- WALLBANG: Wall check
+                        if Config.SilentAimWallCheck then
+                            local rayParams = RaycastParams.new()
+                            rayParams.FilterDescendantsInstances = {Player.Character}
+                            rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+                            rayParams.IgnoreWater = true
+                            local origin = Camera.CFrame.Position
+                            local direction = (targetPart.Position - origin)
+                            local result = workspace:Raycast(origin, direction, rayParams)
+                            if result and result.Instance and not result.Instance:IsDescendantOf(targetPlayer.Character) then
+                                -- Obstructed wall, skip this target
+                                continue
+                            end
+                        end
+
                         if dist < closestDist then
                             closestDist = dist
                             closest = targetPart
@@ -590,8 +604,7 @@ RunService.RenderStepped:Connect(function()
             local humanoid = p.Character:FindFirstChildOfClass("Humanoid")
             if root and humanoid and humanoid.Health > 0 then
                 local pos, onScreen = Camera:WorldToViewportPoint(root.Position)
-                
-                -- CLEAN TRACERS: Only draw when player is actually visible on screen
+                -- Update tracers
                 if Config.ESPTracers and onScreen and Player.Character then
                     local localRoot = Player.Character:FindFirstChild("HumanoidRootPart")
                     if localRoot then
