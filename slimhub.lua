@@ -25,8 +25,10 @@ local SavedPosition = nil
 local MenuPositionBeforeMinimize = UDim2.new(0.5, 0, 0.5, 0)
 local ShootRemotes = {}
 
-local FlyVelocity = nil
-local FlyGyro = nil
+-- Modern Physics Instances
+local FlyAttachment = nil
+local FlyLinearVelocity = nil
+local FlyAlignOrientation = nil
 local AnimationTrack = nil
 
 local Gui = Instance.new("ScreenGui")
@@ -389,9 +391,17 @@ end
 local MainSection = CreateSection(Tabs.Main, "Movement")
 
 local function ClearFlight()
-    if FlyVelocity then FlyVelocity:Destroy(); FlyVelocity = nil end
-    if FlyGyro then FlyGyro:Destroy(); FlyGyro = nil end
+    if FlyLinearVelocity then FlyLinearVelocity:Destroy(); FlyLinearVelocity = nil end
+    if FlyAlignOrientation then FlyAlignOrientation:Destroy(); FlyAlignOrientation = nil end
+    if FlyAttachment then FlyAttachment:Destroy(); FlyAttachment = nil end
     if AnimationTrack then AnimationTrack:Stop(); AnimationTrack:Destroy(); AnimationTrack = nil end
+    
+    local char = Player.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if hum then 
+        hum.PlatformStand = false
+        hum:ChangeState(Enum.HumanoidStateType.GettingUp) 
+    end
 end
 
 local function StartFlight()
@@ -401,16 +411,31 @@ local function StartFlight()
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     if not root or not hum then return end
     
-    FlyVelocity = Instance.new("BodyVelocity")
-    FlyVelocity.MaxForce = Vector3.new(1e5, 1e5, 1e5)
-    FlyVelocity.Velocity = Vector3.zero
-    FlyVelocity.Parent = root
+    -- Network authority trick: Set PlatformStand true to completely stop native physics engine overrides
+    hum.PlatformStand = true
     
-    FlyGyro = Instance.new("BodyGyro")
-    FlyGyro.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
-    FlyGyro.P = 1e4
-    FlyGyro.CFrame = Camera.CFrame
-    FlyGyro.Parent = root
+    FlyAttachment = Instance.new("Attachment")
+    FlyAttachment.Name = "SlimFlyAttachment"
+    FlyAttachment.Parent = root
+    
+    -- Setup Modern Linear Velocity Constraint
+    FlyLinearVelocity = Instance.new("LinearVelocity")
+    FlyLinearVelocity.Name = "SlimFlyVelocity"
+    FlyLinearVelocity.Attachment0 = FlyAttachment
+    FlyLinearVelocity.MaxForce = math.huge
+    FlyLinearVelocity.VelocityConstraintMode = Enum.VelocityConstraintMode.Vector
+    FlyLinearVelocity.VectorVelocity = Vector3.zero
+    FlyLinearVelocity.Parent = root
+    
+    -- Setup Modern Align Orientation Constraint
+    FlyAlignOrientation = Instance.new("AlignOrientation")
+    FlyAlignOrientation.Name = "SlimFlyOrientation"
+    FlyAlignOrientation.Attachment0 = FlyAttachment
+    FlyAlignOrientation.MaxTorque = math.huge
+    FlyAlignOrientation.Responsiveness = 25
+    FlyAlignOrientation.Mode = Enum.OrientationControlMode.OneAttachment
+    FlyAlignOrientation.CFrame = Camera.CFrame
+    FlyAlignOrientation.Parent = root
     
     local animProvider = hum:FindFirstChildOfClass("Animator") or Instance.new("Animator", hum)
     local flyAnim = Instance.new("Animation")
@@ -429,9 +454,6 @@ CreateToggle(MainSection, "Fly", "Flying", function(state)
         StartFlight()
     else
         ClearFlight()
-        local char = Player.Character
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
-        if hum then hum:ChangeState(Enum.HumanoidStateType.GettingUp) end
     end
 end)
 
@@ -673,11 +695,12 @@ RunService.RenderStepped:Connect(function()
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     
     if Config.Flying and root and hum then
-        if not FlyVelocity or FlyVelocity.Parent ~= root or not FlyGyro or FlyGyro.Parent ~= root then
+        if not FlyLinearVelocity or FlyLinearVelocity.Parent ~= root or not FlyAlignOrientation or FlyAlignOrientation.Parent ~= root then
             StartFlight()
         end
         
-        hum:ChangeState(Enum.HumanoidStateType.Freefall)
+        -- Lock physics state
+        hum.PlatformStand = true
         
         local moveDir = Vector3.zero
         if UIS:IsKeyDown(Enum.KeyCode.W) then moveDir += Camera.CFrame.LookVector end
@@ -691,9 +714,10 @@ RunService.RenderStepped:Connect(function()
         local targetRotation = CFrame.new(root.Position, root.Position + Vector3.new(look.X, 0, look.Z))
         
         if moveDir.Magnitude > 0 then
-            FlyVelocity.Velocity = moveDir.Unit * Config.FlySpeed
+            FlyLinearVelocity.VectorVelocity = moveDir.Unit * Config.FlySpeed
             if AnimationTrack then AnimationTrack:AdjustSpeed(1) end
             
+            -- Smooth Dynamic leaning logic
             local horizontalMove = Vector3.new(moveDir.X, 0, moveDir.Z)
             if horizontalMove.Magnitude > 0 then
                 local forwardSpace = root.CFrame:VectorToWorldSpace(Vector3.new(0, 0, -1))
@@ -701,18 +725,22 @@ RunService.RenderStepped:Connect(function()
                 local rightSpace = root.CFrame:VectorToWorldSpace(Vector3.new(1, 0, 0))
                 local rightDot = horizontalMove.Unit:Dot(rightSpace)
                 
-                local tiltAngle = math.rad(-15) * math.clamp(dot, -1, 1)
-                local rollAngle = math.rad(-15) * math.clamp(rightDot, -1, 1)
+                local tiltAngle = math.rad(-20) * math.clamp(dot, -1, 1)
+                local rollAngle = math.rad(-20) * math.clamp(rightDot, -1, 1)
                 targetRotation = targetRotation * CFrame.Angles(tiltAngle, 0, rollAngle)
             end
         else
-            FlyVelocity.Velocity = Vector3.zero
+            -- Kill drifting instantly
+            FlyLinearVelocity.VectorVelocity = Vector3.zero
             if AnimationTrack then AnimationTrack:AdjustSpeed(0) end
         end
         
-        FlyGyro.CFrame = FlyGyro.CFrame:Lerp(targetRotation, 0.2)
+        -- Smoothly interpolate orientation to prevent hard snaps
+        FlyAlignOrientation.CFrame = FlyAlignOrientation.CFrame:Lerp(targetRotation, 0.25)
     else
-        ClearFlight()
+        if FlyLinearVelocity or FlyAlignOrientation then
+            ClearFlight()
+        end
     end
     
     if Config.Invisible and DronePosition and root then
