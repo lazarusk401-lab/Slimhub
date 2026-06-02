@@ -411,6 +411,7 @@ local function StartFlight()
     if not root or not hum then return end
     
     hum.PlatformStand = true
+    hum:ChangeState(Enum.HumanoidStateType.Physics)
     
     FlyAttachment = Instance.new("Attachment")
     FlyAttachment.Name = "SlimFlyAttachment"
@@ -419,7 +420,7 @@ local function StartFlight()
     FlyLinearVelocity = Instance.new("LinearVelocity")
     FlyLinearVelocity.Name = "SlimFlyVelocity"
     FlyLinearVelocity.Attachment0 = FlyAttachment
-    FlyLinearVelocity.MaxForce = 56000 -- Adjusted from math.huge to allow local force replication updates
+    FlyLinearVelocity.MaxForce = math.huge
     FlyLinearVelocity.VelocityConstraintMode = Enum.VelocityConstraintMode.Vector
     FlyLinearVelocity.VectorVelocity = Vector3.zero
     FlyLinearVelocity.Parent = root
@@ -427,8 +428,8 @@ local function StartFlight()
     FlyAlignOrientation = Instance.new("AlignOrientation")
     FlyAlignOrientation.Name = "SlimFlyOrientation"
     FlyAlignOrientation.Attachment0 = FlyAttachment
-    FlyAlignOrientation.MaxTorque = 56000
-    FlyAlignOrientation.Responsiveness = 25
+    FlyAlignOrientation.MaxTorque = math.huge
+    FlyAlignOrientation.Responsiveness = 200
     FlyAlignOrientation.Mode = Enum.OrientationControlMode.OneAttachment
     FlyAlignOrientation.CFrame = Camera.CFrame
     FlyAlignOrientation.Parent = root
@@ -696,6 +697,9 @@ RunService.RenderStepped:Connect(function()
         end
         
         hum.PlatformStand = true
+        if hum:GetState() ~= Enum.HumanoidStateType.Physics then
+            hum:ChangeState(Enum.HumanoidStateType.Physics)
+        end
         
         local moveDir = Vector3.zero
         if UIS:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + Camera.CFrame.LookVector end
@@ -724,7 +728,6 @@ RunService.RenderStepped:Connect(function()
                 targetRotation = targetRotation * CFrame.Angles(tiltAngle, 0, rollAngle)
             end
         else
-            -- Continuous safe counter-force velocity assignment instead of hard vector zeroing out
             FlyLinearVelocity.VectorVelocity = Vector3.new(0, 0, 0)
             if AnimationTrack then AnimationTrack:AdjustSpeed(0) end
         end
