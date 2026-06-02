@@ -745,12 +745,13 @@ for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
     end
 end
 
--- Dragging Listeners
+-- Dragging Listeners (Fixed Mouse Coordinate Offset)
 TopBar.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         Dragging = true
-        local mousePos = UIS:GetMouseLocation()
-        DragOffset = Vector2.new(mousePos.X - MainFrame.AbsolutePosition.X, mousePos.Y - MainFrame.AbsolutePosition.Y)
+        
+        local initialMousePos = Vector2.new(input.Position.X, input.Position.Y)
+        DragOffset = Vector2.new(initialMousePos.X - MainFrame.AbsolutePosition.X, initialMousePos.Y - MainFrame.AbsolutePosition.Y)
         
         input.Changed:Connect(function()
             if input.UserInputState == Enum.UserInputState.End then
@@ -762,12 +763,12 @@ end)
 
 UIS.InputChanged:Connect(function(input)
     if Dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-        local mousePos = UIS:GetMouseLocation()
+        local currentMousePos = Vector2.new(input.Position.X, input.Position.Y)
         TargetPosition = UDim2.new(
             MainFrame.Position.X.Scale,
-            mousePos.X - DragOffset.X + (MainFrame.Size.X.Offset * MainFrame.AnchorPoint.X),
+            currentMousePos.X - DragOffset.X + (MainFrame.Size.X.Offset * MainFrame.AnchorPoint.X),
             MainFrame.Position.Y.Scale,
-            mousePos.Y - DragOffset.Y + (MainFrame.Size.Y.Offset * MainFrame.AnchorPoint.Y)
+            currentMousePos.Y - DragOffset.Y + (MainFrame.Size.Y.Offset * MainFrame.AnchorPoint.Y)
         )
     end
 end)
