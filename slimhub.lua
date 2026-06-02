@@ -37,12 +37,9 @@ local config = {
 }
 
 -- UI States
-local activeTab = "Main"
 local isTweening = false
 local mainDragging = false
-local trayDragging = false
 local dragStart, startPos
-local dragDistance = 0
 local baseSize = 40
 
 -- Container
@@ -133,13 +130,14 @@ contentArea.Position = UDim2.fromOffset(140, 60)
 contentArea.BackgroundTransparency = 1
 contentArea.Parent = mainFrame
 
--- Bottom Right Smooth Minimize Tray Icon
-local trayBtn = Instance.new("Frame")
+-- Bottom Right Locked Tray Button
+local trayBtn = Instance.new("TextButton")
 trayBtn.Name = "Tray"
 trayBtn.Size = UDim2.fromOffset(0, 0)
-trayBtn.Position = UDim2.new(1, -60, 1, -60) -- Anchored permanently to bottom right corner
+trayBtn.Position = UDim2.new(1, -60, 1, -60) -- Locked to bottom-right boundary
 trayBtn.AnchorPoint = Vector2.new(0.5, 0.5)
 trayBtn.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
+trayBtn.Text = ""
 trayBtn.Visible = false
 trayBtn.ZIndex = 10
 trayBtn.Parent = gui
@@ -404,7 +402,7 @@ local function createSlider(parent, text, configKey, min, max, callback)
     end)
 end
 
--- Rebuilding All Original Feature Pages Structurally
+-- Rebuilding Feature Tab Menus
 createTab("Main")
 createTab("ESP")
 createTab("Prison")
@@ -416,7 +414,7 @@ createTabButton("ESP")
 createTabButton("Prison")
 createTabButton("Settings")
 
--- Main Tab Modules
+-- Setup Feature Sections
 local mainSection = createSection(tabs.Main, "Movement")
 createToggle(mainSection, "Fly", "Flying")
 createSlider(mainSection, "Fly Speed", "FlySpeed", 16, 250)
@@ -435,31 +433,28 @@ end)
 createToggle(mainSection, "Noclip", "Noclip")
 createToggle(mainSection, "Infinite Jump", "InfiniteJump")
 
--- ESP Tab Modules
 local espSection = createSection(tabs.ESP, "Visuals")
 createToggle(espSection, "ESP Enabled", "ESPEnabled")
 createToggle(espSection, "Show Tracers", "ESPTracers")
 createToggle(espSection, "Show Names", "ESPNames")
 createToggle(espSection, "Rainbow Mode", "ESPRainbow")
 
--- Combat Tab Modules
 local combatSection = createSection(tabs.Prison, "Combat")
 createToggle(combatSection, "Silent Aim", "SilentAim")
 createSlider(combatSection, "FOV Size", "SilentAimFOV", 50, 400)
 
--- Settings Tab Modules
 local settingsSection = createSection(tabs.Settings, "Keybinds")
 
--- Smooth Transition Engine (Sliding down to bottom-right corner)
+-- Smooth Transition Engine (Strictly Corner Collapsing Structure)
 local function toggleUI()
     if isTweening then return end
     isTweening = true
-    isMinimized = not isMinimized
+    config.IsMinimized = not config.IsMinimized
     
     local speedInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
     
-    if isMinimized then
-        -- Smoothly slide and shrink main window down to bottom right
+    if config.IsMinimized then
+        -- Direct slide anchor manipulation into bottom right corner layout bounds
         local hideMain = tweenService:Create(mainFrame, speedInfo, {
             Size = UDim2.fromOffset(0, 0),
             Position = UDim2.new(1, -60, 1, -60)
@@ -483,7 +478,6 @@ local function toggleUI()
             trayBtn.Visible = false
             mainFrame.Visible = true
             
-            -- Smoothly open back up to full size into center screen position
             local showMain = tweenService:Create(mainFrame, speedInfo, {
                 Size = UDim2.fromOffset(500, 380),
                 Position = UDim2.new(0.5, 0, 0.5, 0)
@@ -496,27 +490,11 @@ local function toggleUI()
     end
 end
 
+-- Input Mappings
 minBtn.MouseButton1Click:Connect(toggleUI)
+trayBtn.MouseButton1Click:Connect(toggleUI)
 
--- Fixed Click Handler on Bottom Right Corner Tray (Cannot get trapped in drag errors)
-trayBtn.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        trayDragging = true
-        dragDistance = 0
-    end
-end)
-
-uis.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        if trayDragging then
-            trayDragging = false
-            toggleUI() -- Stationary button execution
-        end
-        mainDragging = false
-    end
-end)
-
--- Main Frame Drag Processing
+-- Main Frame Drag Mappings
 topBar.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         mainDragging = true
@@ -527,19 +505,25 @@ end)
 
 uis.InputChanged:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-        if mainDragging and not isMinimized then
+        if mainDragging and not config.IsMinimized then
             local delta = input.Position - dragStart
             mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
         end
     end
 end)
 
--- Global Keybind Handling
+uis.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        mainDragging = false
+    end
+end)
+
+-- Global Keybind Processing
 uis.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     if config.MenuKeybind and input.KeyCode == config.MenuKeybind then
         config.MenuOpen = not config.MenuOpen
-        if isMinimized then
+        if config.IsMinimized then
             trayBtn.Visible = config.MenuOpen
         else
             mainFrame.Visible = config.MenuOpen
@@ -547,7 +531,7 @@ uis.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
--- Feature Systems Loop (Fly, WalkSpeed, Noclip)
+-- Background Runtime Thread Logic
 runService.RenderStepped:Connect(function()
     if config.Flying and player.Character then
         local root = player.Character:FindFirstChild("HumanoidRootPart")
