@@ -383,12 +383,19 @@ local function CreateKeybindButton(parent, text, configKey, callback)
 end
 
 local MainSection = CreateSection(Tabs.Main, "Movement")
+local BodyVelocity, BodyGyro
+
+local function CleanFlightInstances()
+    if BodyVelocity then BodyVelocity:Destroy(); BodyVelocity = nil end
+    if BodyGyro then BodyGyro:Destroy(); BodyGyro = nil end
+end
+
 CreateToggle(MainSection, "Fly", "Flying", function(state)
+    CleanFlightInstances()
     local char = Player.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     if not state and root and hum then
-        root.AssemblyLinearVelocity = Vector3.zero
         hum:ChangeState(Enum.HumanoidStateType.GettingUp)
     end
 end)
@@ -611,12 +618,18 @@ if hookmetamethod then
     local oldNamecall
     oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
         local method = getnamecallmethod()
-        if method == "FireServer" and Config.SilentAim feeling and self:IsA("RemoteEvent") and (IsShootRemote(self) or table.find(ShootRemotes, self)) then
+        if method == "FireServer" and Config.SilentAim and self:IsA("RemoteEvent") and (IsShootRemote(self) or table.find(ShootRemotes, self)) then
             return oldNamecall(self, unpack(ModifyArgs({...})))
         end
         return oldNamecall(self, ...)
     end)
 end
+
+Player.CharacterAdding:Connect(function()
+    CleanFlightInstances()
+    Config.Flying = false
+    if ToggleCallbacks.Flying then ToggleCallbacks.Flying(false) end
+end)
 
 RunService.RenderStepped:Connect(function()
     local char = Player.Character
@@ -624,7 +637,21 @@ RunService.RenderStepped:Connect(function()
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     
     if Config.Flying and root and hum then
-        hum:ChangeState(Enum.HumanoidStateType.Physics)
+        if not BodyVelocity or BodyVelocity.Parent ~= root then
+            CleanFlightInstances()
+            BodyVelocity = Instance.new("BodyVelocity")
+            BodyVelocity.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+            BodyVelocity.Velocity = Vector3.zero
+            BodyVelocity.Parent = root
+            
+            BodyGyro = Instance.new("BodyGyro")
+            BodyGyro.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
+            BodyGyro.P = 1e4
+            BodyGyro.CFrame = Camera.CFrame
+            BodyGyro.Parent = root
+        end
+        
+        hum:ChangeState(Enum.HumanoidStateType.Freefall)
         
         local moveDir = Vector3.zero
         if UIS:IsKeyDown(Enum.KeyCode.W) then moveDir += Camera.CFrame.LookVector end
@@ -634,11 +661,14 @@ RunService.RenderStepped:Connect(function()
         if UIS:IsKeyDown(Enum.KeyCode.Space) then moveDir += Vector3.yAxis end
         if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then moveDir -= Vector3.yAxis end
         
+        BodyGyro.CFrame = Camera.CFrame
         if moveDir.Magnitude > 0 then
-            root.AssemblyLinearVelocity = moveDir.Unit * Config.FlySpeed
+            BodyVelocity.Velocity = moveDir.Unit * Config.FlySpeed
         else
-            root.AssemblyLinearVelocity = Vector3.zero
+            BodyVelocity.Velocity = Vector3.zero
         end
+    else
+        CleanFlightInstances()
     end
     
     if Config.Invisible and DronePosition and root then
