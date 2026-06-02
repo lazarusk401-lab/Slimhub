@@ -45,6 +45,7 @@ local ESPObjects = {}
 local ToggleCallbacks = {}
 local DroneNode = nil
 local SavedPosition = nil
+local MenuPositionBeforeMinimize = UDim2.new(0.5, 0, 0.5, 0) -- Saves position for smooth return
 
 -- UI Setup
 local Gui = Instance.new("ScreenGui")
@@ -59,7 +60,7 @@ MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
 MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
 MainFrame.BackgroundColor3 = Color3.fromRGB(13, 13, 17)
 MainFrame.BorderSizePixel = 0
-MainFrame.ClipsDescendants = true
+MainFrame.ClipsDescendants = true -- Crucial for clean shrinking animation
 MainFrame.Parent = Gui
 
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 12)
@@ -168,7 +169,7 @@ MinimizedIcon.MouseLeave:Connect(function()
     TweenService:Create(MinimizedIcon, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(13, 13, 17)}):Play()
 end)
 
--- Minimize Button Functionality
+-- Minimize Button Functionality (Smooth Tween)
 local MinBtn = Instance.new("TextButton")
 MinBtn.Name = "MinBtn"
 MinBtn.Size = UDim2.fromOffset(30, 30)
@@ -182,17 +183,62 @@ MinBtn.Parent = TopBar
 
 Instance.new("UICorner", MinBtn).CornerRadius = UDim.new(0, 8)
 
-MinBtn.MouseButton1Click:Connect(function()
+local function MinimizeMenu()
+    if Config.IsMinimized then return end
     Config.IsMinimized = true
-    MainFrame.Visible = false
-    MinimizedIcon.Visible = true
-end)
+    MenuPositionBeforeMinimize = MainFrame.Position -- Save current dragged position
+    Dragging = false -- Cancel any active drag
+    
+    -- Calculate exact center match for the corner (Icon is at 1,-60 with size 45, so center is 1,-37.5)
+    local targetPos = UDim2.new(1, -37.5, 1, -37.5)
+    
+    local tweenOut = TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {
+        Size = UDim2.fromOffset(45, 45),
+        Position = targetPos
+    })
+    
+    tweenOut.Completed:Connect(function()
+        if not Config.IsMinimized then return end -- Safety check if user spams clicks
+        MainFrame.Visible = false
+        
+        -- Reset instantly behind the scenes for the next time it opens
+        MainFrame.Size = UDim2.fromOffset(500, 380)
+        MainFrame.Position = MenuPositionBeforeMinimize 
+        
+        -- Show and "pop" the icon
+        MinimizedIcon.Visible = true
+        MinimizedIcon.Size = UDim2.fromOffset(0, 0)
+        TweenService:Create(MinimizedIcon, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+            Size = UDim2.fromOffset(45, 45)
+        }):Play()
+    end)
+    
+    tweenOut:Play()
+end
 
-MinimizedIcon.MouseButton1Click:Connect(function()
+local function MaximizeMenu()
+    if not Config.IsMinimized then return end
     Config.IsMinimized = false
+    
+    -- Shrink icon away
+    TweenService:Create(MinimizedIcon, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {
+        Size = UDim2.fromOffset(0, 0)
+    }):Play()
+    
+    -- Prepare MainFrame at the exact corner location
     MainFrame.Visible = true
-    MinimizedIcon.Visible = false
-end)
+    MainFrame.Size = UDim2.fromOffset(45, 45)
+    MainFrame.Position = UDim2.new(1, -37.5, 1, -37.5)
+    
+    -- Tween MainFrame back to its saved position and full size
+    TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+        Size = UDim2.fromOffset(500, 380),
+        Position = MenuPositionBeforeMinimize
+    }):Play()
+end
+
+MinBtn.MouseButton1Click:Connect(MinimizeMenu)
+MinimizedIcon.MouseButton1Click:Connect(MaximizeMenu)
 
 -- Tab Generator
 local Tabs = {}
@@ -710,19 +756,10 @@ end
 UIS.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     if Config.MenuKeybind and input.KeyCode == Config.MenuKeybind then
-        Config.MenuOpen = not Config.MenuOpen
-        if Config.MenuOpen then
-            if Config.IsMinimized then
-                MainFrame.Visible = false
-                MinimizedIcon.Visible = true
-            else
-                MainFrame.Visible = true
-                MinimizedIcon.Visible = false
-            end
+        if Config.IsMinimized then
+            MaximizeMenu()
         else
-            MainFrame.Visible = false
-            MinimizedIcon.Visible = false
-            Config.IsMinimized = false -- Reset minimize state when fully closing menu
+            MinimizeMenu()
         end
     end
 end)
