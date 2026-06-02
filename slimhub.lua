@@ -49,6 +49,7 @@ local DragStart = nil
 local StartPos = nil
 local DroneNode = nil
 local SavedPosition = nil
+local IsTweeningMin = false
 
 -- UI
 local Gui = Instance.new("ScreenGui")
@@ -66,7 +67,8 @@ MainFrame.BorderSizePixel = 0
 MainFrame.ClipsDescendants = true
 MainFrame.Parent = Gui
 
-Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 12)
+local MainCorner = Instance.new("UICorner", MainFrame)
+MainCorner.CornerRadius = UDim.new(0, 12)
 
 local Stroke = Instance.new("UIStroke", MainFrame)
 Stroke.Color = Color3.fromRGB(40, 40, 50)
@@ -746,8 +748,55 @@ for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
     end
 end
 
--- Completely Rewritten Dragging Engine (No Lerping, Locked delta scaling)
+-- Smooth Minimize Action Toggle Engine
+local function ToggleMinimize()
+    if IsTweeningMin then return end
+    IsTweeningMin = true
+    
+    Config.IsMinimized = not Config.IsMinimized
+    
+    local Info = TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+    local TargetSize, TargetCorner
+    
+    if Config.IsMinimized then
+        -- Hide items instantly so they don't leak out of the circle boundary
+        Sidebar.Visible = false
+        ContentArea.Visible = false
+        Cover.Visible = false
+        Title.Visible = false
+        MinBtn.Text = "+"
+        
+        TargetSize = UDim2.fromOffset(50, 50)
+        TargetCorner = UDim.new(1, 0) -- Circle corner
+    else
+        TargetSize = UDim2.fromOffset(500, 380)
+        TargetCorner = UDim.new(0, 12) -- Standard box corner
+        MinBtn.Text = "-"
+    end
+    
+    local SizeTween = TweenService:Create(MainFrame, Info, {Size = TargetSize})
+    local CornerTween = TweenService:Create(MainCorner, Info, {CornerRadius = TargetCorner})
+    
+    SizeTween:Play()
+    CornerTween:Play()
+    
+    SizeTween.Completed:Connect(function()
+        if not Config.IsMinimized then
+            -- Unhide components smoothly once open
+            Sidebar.Visible = true
+            ContentArea.Visible = true
+            Cover.Visible = true
+            Title.Visible = true
+        end
+        IsTweeningMin = false
+    end)
+end
+
+MinBtn.MouseButton1Click:Connect(ToggleMinimize)
+
+-- Rock Solid Pure Offset Dragging System (No Scale Drift)
 TopBar.InputBegan:Connect(function(input)
+    if Config.IsMinimized then return end -- Guard dragging if minimized
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         Dragging = true
         DragStart = input.Position
@@ -764,13 +813,21 @@ end)
 UIS.InputChanged:Connect(function(input)
     if Dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
         local delta = input.Position - DragStart
-        -- Instantly sets the offset directly relative to frame's anchor math
         MainFrame.Position = UDim2.new(
             StartPos.X.Scale, 
             StartPos.X.Offset + delta.X, 
             StartPos.Y.Scale, 
             StartPos.Y.Offset + delta.Y
         )
+    end
+end)
+
+-- Global Menu Keybind Listener
+UIS.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if Config.MenuKeybind and input.KeyCode == Config.MenuKeybind then
+        Config.MenuOpen = not Config.MenuOpen
+        MainFrame.Visible = Config.MenuOpen
     end
 end)
 
