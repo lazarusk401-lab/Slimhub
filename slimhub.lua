@@ -122,20 +122,6 @@ UIS.InputEnded:Connect(function(input)
     end
 end)
 
--- Minimize Button
-local MinBtn = Instance.new("TextButton")
-MinBtn.Name = "MinBtn"
-MinBtn.Size = UDim2.fromOffset(30, 30)
-MinBtn.Position = UDim2.new(1, -45, 0.5, -15)
-MinBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 36)
-MinBtn.Text = "-"
-MinBtn.Font = Enum.Font.GothamBold
-MinBtn.TextSize = 18
-MinBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
-MinBtn.Parent = TopBar
-
-Instance.new("UICorner", MinBtn).CornerRadius = UDim.new(0, 8)
-
 -- Sidebar
 local Sidebar = Instance.new("Frame")
 Sidebar.Size = UDim2.new(0, 130, 1, -50)
@@ -153,6 +139,35 @@ ContentArea.Size = UDim2.new(1, -145, 1, -65)
 ContentArea.Position = UDim2.fromOffset(140, 60)
 ContentArea.BackgroundTransparency = 1
 ContentArea.Parent = MainFrame
+
+-- Minimize Button Functionality
+local MinBtn = Instance.new("TextButton")
+MinBtn.Name = "MinBtn"
+MinBtn.Size = UDim2.fromOffset(30, 30)
+MinBtn.Position = UDim2.new(1, -45, 0.5, -15)
+MinBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 36)
+MinBtn.Text = "-"
+MinBtn.Font = Enum.Font.GothamBold
+MinBtn.TextSize = 18
+MinBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+MinBtn.Parent = TopBar
+
+Instance.new("UICorner", MinBtn).CornerRadius = UDim.new(0, 8)
+
+MinBtn.MouseButton1Click:Connect(function()
+    Config.IsMinimized = not Config.IsMinimized
+    if Config.IsMinimized then
+        Sidebar.Visible = false
+        ContentArea.Visible = false
+        MainFrame.Size = UDim2.fromOffset(500, 50)
+        MinBtn.Text = "+"
+    else
+        MainFrame.Size = UDim2.fromOffset(500, 380)
+        Sidebar.Visible = true
+        ContentArea.Visible = true
+        MinBtn.Text = "-"
+    end
+end)
 
 -- Tab Generator
 local Tabs = {}
@@ -665,6 +680,15 @@ local function CreateESP(player)
     
     ESPObjects[player] = {Box = box, Name = name, Tracer = tracer}
 end
+
+-- Menu Toggle Bind (Keyboard Listener)
+UIS.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if Config.MenuKeybind and input.KeyCode == Config.MenuKeybind then
+        Config.MenuOpen = not Config.MenuOpen
+        MainFrame.Visible = Config.MenuOpen
+    end
+end)
 
 Players.PlayerAdded:Connect(function(p)
     if p ~= Player then CreateESP(p) end
