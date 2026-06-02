@@ -25,8 +25,6 @@ local SavedPosition = nil
 local MenuPositionBeforeMinimize = UDim2.new(0.5, 0, 0.5, 0)
 local ShootRemotes = {}
 
-local FlyBodyVelocity = nil
-local FlyBodyGyro = nil
 local AnimationTrack = nil
 
 local Gui = Instance.new("ScreenGui")
@@ -389,10 +387,7 @@ end
 local MainSection = CreateSection(Tabs.Main, "Movement")
 
 local function ClearFlight()
-    if FlyBodyVelocity then FlyBodyVelocity:Destroy(); FlyBodyVelocity = nil end
-    if FlyBodyGyro then FlyBodyGyro:Destroy(); FlyBodyGyro = nil end
     if AnimationTrack then AnimationTrack:Stop(); AnimationTrack:Destroy(); AnimationTrack = nil end
-    
     local char = Player.Character
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     if hum then 
@@ -403,22 +398,8 @@ end
 local function StartFlight()
     ClearFlight()
     local char = Player.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
     local hum = char and char:FindFirstChildOfClass("Humanoid")
-    if not root or not hum then return end
-    
-    FlyBodyVelocity = Instance.new("BodyVelocity")
-    FlyBodyVelocity.Name = "SlimFlyVelocity_Legacy"
-    FlyBodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-    FlyBodyVelocity.Velocity = Vector3.zero
-    FlyBodyVelocity.Parent = root
-    
-    FlyBodyGyro = Instance.new("BodyGyro")
-    FlyBodyGyro.Name = "SlimFlyGyro_Legacy"
-    FlyBodyGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-    FlyBodyGyro.P = 15000
-    FlyBodyGyro.CFrame = Camera.CFrame
-    FlyBodyGyro.Parent = root
+    if not hum then return end
     
     local animProvider = hum:FindFirstChildOfClass("Animator") or Instance.new("Animator", hum)
     local flyAnim = Instance.new("Animation")
@@ -659,7 +640,7 @@ if hookmetamethod then
     local oldNamecall
     oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
         local method = getnamecallmethod()
-        if method == "FireServer" and Config.SilentAim feeling self:IsA("RemoteEvent") and (IsShootRemote(self) or table.find(ShootRemotes, self)) then
+        if method == "FireServer" and Config.SilentAim and self:IsA("RemoteEvent") and (IsShootRemote(self) or table.find(ShootRemotes, self)) then
             return oldNamecall(self, unpack(ModifyArgs({...})))
         end
         return oldNamecall(self, ...)
@@ -672,16 +653,12 @@ Player.CharacterAdding:Connect(function()
     if ToggleCallbacks.Flying then ToggleCallbacks.Flying(false) end
 end)
 
-RunService.RenderStepped:Connect(function()
+RunService.RenderStepped:Connect(function(deltaTime)
     local char = Player.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     
     if Config.Flying and root and hum then
-        if not FlyBodyVelocity or FlyBodyVelocity.Parent ~= root or not FlyBodyGyro or FlyBodyGyro.Parent ~= root then
-            StartFlight()
-        end
-        
         hum.PlatformStand = true
         
         local moveDir = Vector3.zero
@@ -693,11 +670,11 @@ RunService.RenderStepped:Connect(function()
         if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then moveDir = moveDir - Vector3.new(0, 1, 0) end
         
         local look = Camera.CFrame.LookVector
-        local targetRotation = CFrame.new(root.Position, root.Position + Vector3.new(look.X, 0, look.Z))
+        local targetCFrame = CFrame.new(root.Position, root.Position + Vector3.new(look.X, 0, look.Z))
         
         if moveDir.Magnitude > 0 then
-            FlyBodyVelocity.Velocity = moveDir.Unit * Config.FlySpeed
             if AnimationTrack then AnimationTrack:AdjustSpeed(1) end
+            local newPosition = root.Position + (moveDir.Unit * Config.FlySpeed * deltaTime)
             
             local horizontalMove = Vector3.new(moveDir.X, 0, moveDir.Z)
             if horizontalMove.Magnitude > 0 then
@@ -708,18 +685,16 @@ RunService.RenderStepped:Connect(function()
                 
                 local tiltAngle = math.rad(-20) * math.clamp(dot, -1, 1)
                 local rollAngle = math.rad(-20) * math.clamp(rightDot, -1, 1)
-                targetRotation = targetRotation * CFrame.Angles(tiltAngle, 0, rollAngle)
+                targetCFrame = CFrame.new(newPosition, newPosition + Vector3.new(look.X, 0, look.Z)) * CFrame.Angles(tiltAngle, 0, rollAngle)
+            else
+                targetCFrame = CFrame.new(newPosition, newPosition + Vector3.new(look.X, 0, look.Z))
             end
         else
-            FlyBodyVelocity.Velocity = Vector3.new(0, 0, 0)
             if AnimationTrack then AnimationTrack:AdjustSpeed(0) end
+            targetCFrame = CFrame.new(root.Position, root.Position + Vector3.new(look.X, 0, look.Z))
         end
         
-        FlyBodyGyro.CFrame = targetRotation
-    else
-        if FlyBodyVelocity or FlyBodyGyro then
-            ClearFlight()
-        end
+        root.CFrame = targetCFrame
     end
     
     if Config.Invisible and DronePosition and root then
@@ -730,73 +705,88 @@ RunService.RenderStepped:Connect(function()
         if UIS:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + Camera.CFrame.RightVector end
         local speed = Config.SpeedHack and Config.HackSpeed or Config.DroneSpeed
         if moveDir.Magnitude > 0 then
-            DronePosition = DronePosition + Vector3.new(moveDir.X, 0, moveDir.Z).Unit * speed * 0.016
+            DronePosition = DronePosition + Vector3.new(moveDir.X, 0, moveDir.Z).Unit * speed * deltaTime
         end
         root.CFrame = CFrame.new(DronePosition.X, DronePosition.Y - 100, DronePosition.Z)
     end
-end)
 
-RunService.Stepped:Connect(function()
-    if Config.Noclip and Player.Character then
-        for _, part in ipairs(Player.Character:GetDescendants()) do
-            if part:IsA("BasePart") then part.CanCollide = false end
+    -- FOV Rendering Logic
+    if Config.SilentAim then
+        local mousePos = UIS:GetMouseLocation()
+        FOVCircle.Position = mousePos
+        FOVCircle.Radius = Config.SilentAimFOV
+        FOVCircle.Visible = true
+    else
+        FOVCircle.Visible = false
+    end
+
+    -- ESP Rendering Loop
+    local tickValue = tick()
+    local rainbowColor = Color3.fromHSV((tickValue % 5) / 5, 1, 1)
+    
+    for p, drawings in pairs(ESPObjects) do
+        local box = drawings.Box
+        local name = drawings.Name
+        local tracer = drawings.Tracer
+        
+        local pChar = p.Character
+        local pRoot = pChar and pChar:FindFirstChild("HumanoidRootPart")
+        local pHum = pChar and pChar:FindFirstChildOfClass("Humanoid")
+        
+        if Config.ESPEnabled and pRoot and pHum and pHum.Health > 0 then
+            local pos, onScreen = Camera:WorldToViewportPoint(pRoot.Position)
+            
+            if onScreen then
+                local currentC = Config.ESPRainbow and rainbowColor or Color3.fromRGB(0, 255, 150)
+                
+                -- Calculations for bounding screen dimensions based on distance
+                local factor = 1 / (pos.Z * math.tan(math.rad(Camera.FieldOfView / 2))) * 1000
+                local w, h = 4 * factor, 6 * factor
+                
+                box.Size = Vector2.new(w, h)
+                box.Position = Vector2.new(pos.X - w / 2, pos.Y - h / 2)
+                box.Color = currentC
+                box.Visible = true
+                
+                if Config.ESPNames then
+                    name.Text = p.Name .. " [" .. math.floor(pHum.Health) .. "]"
+                    name.Position = Vector2.new(pos.X, (pos.Y - h / 2) - 15)
+                    name.Visible = true
+                else
+                    name.Visible = false
+                end
+                
+                if Config.ESPTracers then
+                    tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+                    tracer.To = Vector2.new(pos.X, pos.Y + h / 2)
+                    tracer.Color = currentC
+                    tracer.Visible = true
+                else
+                    tracer.Visible = false
+                end
+            else
+                box.Visible = false
+                name.Visible = false
+                tracer.Visible = false
+            end
+        else
+            box.Visible = false
+            name.Visible = false
+            tracer.Visible = false
         end
     end
 end)
 
-RunService.RenderStepped:Connect(function()
-    local espColor = Config.ESPRainbow and Color3.fromHSV((tick() * 0.5) % 1, 1, 1) or Color3.fromRGB(0, 255, 150)
-    FOVCircle.Visible = Config.SilentAim; FOVCircle.Position = UIS:GetMouseLocation()
-    FOVCircle.Radius = Config.SilentAimFOV; FOVCircle.Color = espColor
-    
-    for p, drawings in pairs(ESPObjects) do
-        if Config.ESPEnabled and p.Character then
-            local root = p.Character:FindFirstChild("HumanoidRootPart")
-            local humanoid = p.Character:FindFirstChildOfClass("Humanoid")
-            if root and humanoid and humanoid.Health > 0 then
-                local pos, onScreen = Camera:WorldToViewportPoint(root.Position)
-                
-                if Config.ESPTracers and onScreen and Player.Character then
-                    local localRoot = Player.Character:FindFirstChild("HumanoidRootPart")
-                    if localRoot then
-                        local myPos = Camera:WorldToViewportPoint(localRoot.Position)
-                        drawings.Tracer.From = Vector2.new(myPos.X, myPos.Y)
-                        drawings.Tracer.To = Vector2.new(pos.X, pos.Y)
-                        drawings.Tracer.Color = espColor
-                        drawings.Tracer.Visible = true
-                    end
-                else
-                    drawings.Tracer.Visible = false
+-- Noclip Collisions Loop
+RunService.Stepped:Connect(function()
+    if Config.Noclip then
+        local char = Player.Character
+        if char then
+            for _, part in ipairs(char:GetDescendants()) do
+                if part:IsA("BasePart") and part.CanCollide then
+                    part.CanCollide = false
                 end
-
-                if onScreen then
-                    local sizeY = math.abs(Camera:WorldToViewportPoint(root.Position + Vector3.new(0, 3, 0)).Y - Camera:WorldToViewportPoint(root.Position - Vector3.new(0, 3, 0)).Y)
-                    drawings.Box.Size = Vector2.new(sizeY * 0.6, sizeY)
-                    drawings.Box.Position = Vector2.new(pos.X - (sizeY * 0.3), pos.Y - sizeY/2)
-                    drawings.Box.Color = espColor
-                    drawings.Box.Visible = true
-                    
-                    if Config.ESPNames then
-                        drawings.Name.Text = p.Name
-                        drawings.Name.Position = Vector2.new(pos.X, pos.Y - (sizeY/2) - 15)
-                        drawings.Name.Color = Color3.fromRGB(255, 255, 255)
-                        drawings.Name.Visible = true
-                    else
-                        drawings.Name.Visible = false
-                    end
-                else
-                    drawings.Box.Visible = false
-                    drawings.Name.Visible = false
-                end
-            else
-                drawings.Box.Visible = false
-                drawings.Name.Visible = false
-                drawings.Tracer.Visible = false
             end
-        else
-            drawings.Box.Visible = false
-            drawings.Name.Visible = false
-            drawings.Tracer.Visible = false
         end
     end
 end)
