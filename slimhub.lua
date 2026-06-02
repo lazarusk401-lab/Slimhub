@@ -18,17 +18,16 @@ local Config = {
     SpeedKeybind = nil, IsMinimized = false, MenuOpen = true, ActiveTab = "Main"
 }
 
+-- Global variables for the new CFrame Fly system
+local FlyTargetCFrame = CFrame.new()
+local AnimationTrack = nil
+
 local ESPObjects = {}
 local ToggleCallbacks = {}
 local DronePosition = nil
 local SavedPosition = nil
 local MenuPositionBeforeMinimize = UDim2.new(0.5, 0, 0.5, 0)
 local ShootRemotes = {}
-
-local AnimationTrack = nil
-local FlyVelocity = nil
-local FlyGyro = nil
-local FlyAttachment = nil
 
 local Gui = Instance.new("ScreenGui")
 Gui.Name = "SlimHub"
@@ -258,8 +257,10 @@ local function CreateToggle(parent, text, configKey, callback)
     local Row = Instance.new("Frame", parent)
     Row.Size = UDim2.new(1, 0, 0, 36)
     Row.BackgroundTransparency = 1
+    
     local Label = Instance.new("TextLabel", Row)
     Label.Size = UDim2.new(1, -70, 1, 0)
+    Label.Position = UDim2.fromOffset(0, 0)
     Label.BackgroundTransparency = 1
     Label.Text = text
     Label.Font = Enum.Font.Gotham
@@ -283,15 +284,49 @@ local function CreateToggle(parent, text, configKey, callback)
     
     local function Update(state)
         Config[configKey] = state
-        -- Added smooth tween animations for toggle operations
         TweenService:Create(ToggleBtn, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
-            BackgroundColor3 = state and Color3.fromRGB(0, 255, 150) or Color3.fromRGB(35, 35, 45)
+            BackgroundColor3 = state and Color3.fromRGB(0, 255, 150) or (Row:GetAttribute("Hovering") and Color3.fromRGB(45, 45, 58) or Color3.fromRGB(35, 35, 45))
         }):Play()
         TweenService:Create(Knob, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
             Position = state and UDim2.new(1, -21, 0.5, -9) or UDim2.new(0, 3, 0.5, -9)
         }):Play()
         if callback then callback(state) end
     end
+    
+    -- HOVER ANIMATIONS
+    local HoverArea = Instance.new("TextButton", Row)
+    HoverArea.Size = UDim2.fromScale(1, 1)
+    HoverArea.BackgroundTransparency = 1
+    HoverArea.Text = ""
+    HoverArea.ZIndex = 0
+    
+    HoverArea.MouseEnter:Connect(function()
+        Row:SetAttribute("Hovering", true)
+        TweenService:Create(Label, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+            TextColor3 = Color3.fromRGB(255, 255, 255),
+            Position = UDim2.fromOffset(4, 0) -- Subtle indent animation
+        }):Play()
+        if not Config[configKey] then
+            TweenService:Create(ToggleBtn, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+                BackgroundColor3 = Color3.fromRGB(45, 45, 58)
+            }):Play()
+        end
+    end)
+    
+    HoverArea.MouseLeave:Connect(function()
+        Row:SetAttribute("Hovering", nil)
+        TweenService:Create(Label, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+            TextColor3 = Color3.fromRGB(220, 220, 230),
+            Position = UDim2.fromOffset(0, 0)
+        }):Play()
+        if not Config[configKey] then
+            TweenService:Create(ToggleBtn, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+                BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+            }):Play()
+        end
+    end)
+    
+    HoverArea.MouseButton1Click:Connect(function() Update(not Config[configKey]) end)
     ToggleBtn.MouseButton1Click:Connect(function() Update(not Config[configKey]) end)
     ToggleCallbacks[configKey] = Update
 end
@@ -346,7 +381,6 @@ local function CreateSlider(parent, text, configKey, min, max, callback)
         local val = math.floor(min + (pos * (max - min))); Config[configKey] = val
         ValueLabel.Text = tostring(val)
         
-        -- Added smooth tween transitions for slider position changes
         local tweenTime = isDragging and 0.05 or 0.25
         local tInfo = TweenInfo.new(tweenTime, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
         
@@ -404,12 +438,6 @@ local MainSection = CreateSection(Tabs.Main, "Movement")
 
 local function ClearFlight()
     if AnimationTrack then AnimationTrack:Stop(); AnimationTrack:Destroy(); AnimationTrack = nil end
-    
-    -- Cleanup physical constraints safely
-    if FlyVelocity then FlyVelocity:Destroy(); FlyVelocity = nil end
-    if FlyGyro then FlyGyro:Destroy(); FlyGyro = nil end
-    if FlyAttachment then FlyAttachment:Destroy(); FlyAttachment = nil end
-    
     local char = Player.Character
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     if hum then 
@@ -424,20 +452,7 @@ local function StartFlight()
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     if not root or not hum then return end
     
-    -- Set up precise physical constraints for completely smooth physics replication
-    FlyAttachment = Instance.new("Attachment", root)
-    FlyAttachment.Name = "FlyAttachment"
-    
-    FlyVelocity = Instance.new("LinearVelocity", root)
-    FlyVelocity.Attachment0 = FlyAttachment
-    FlyVelocity.MaxForce = math.huge
-    FlyVelocity.VectorVelocity = Vector3.zero
-    
-    FlyGyro = Instance.new("AlignOrientation", root)
-    FlyGyro.Attachment0 = FlyAttachment
-    FlyGyro.MaxTorque = math.huge
-    FlyGyro.Responsiveness = 25
-    FlyGyro.CFrame = root.CFrame
+    FlyTargetCFrame = root.CFrame
     
     local animProvider = hum:FindFirstChildOfClass("Animator") or Instance.new("Animator", hum)
     local flyAnim = Instance.new("Animation")
@@ -452,11 +467,7 @@ local function StartFlight()
 end
 
 CreateToggle(MainSection, "Fly", "Flying", function(state)
-    if state then
-        StartFlight()
-    else
-        ClearFlight()
-    end
+    if state then StartFlight() else ClearFlight() end
 end)
 
 CreateSlider(MainSection, "Fly Speed", "FlySpeed", 16, 250)
@@ -503,9 +514,7 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
     if not gameProcessed and Config.InfiniteJump and input.KeyCode == Enum.KeyCode.Space then
         local char = Player.Character
         local hum = char and char:FindFirstChildOfClass("Humanoid")
-        if hum then
-            hum:ChangeState(Enum.HumanoidStateType.Jumping)
-        end
+        if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
     end
 end)
 
@@ -696,8 +705,8 @@ RunService.RenderStepped:Connect(function(deltaTime)
     local root = char and char:FindFirstChild("HumanoidRootPart")
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     
-    -- Smooth Physics Flying Interpolation Block
-    if Config.Flying and root and hum and FlyVelocity and FlyGyro then
+    -- MATHEMATICAL DELTA-TIME LERP FLYING SYSTEM
+    if Config.Flying and root and hum then
         hum.PlatformStand = true
         
         local moveDir = Vector3.zero
@@ -709,10 +718,11 @@ RunService.RenderStepped:Connect(function(deltaTime)
         if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then moveDir = moveDir - Vector3.new(0, 1, 0) end
         
         local look = Camera.CFrame.LookVector
+        local targetCFrame = FlyTargetCFrame
         
         if moveDir.Magnitude > 0 then
             if AnimationTrack then AnimationTrack:AdjustSpeed(1) end
-            FlyVelocity.VectorVelocity = moveDir.Unit * Config.FlySpeed
+            local newPos = targetCFrame.Position + (moveDir.Unit * Config.FlySpeed * deltaTime)
             
             local horizontalMove = Vector3.new(moveDir.X, 0, moveDir.Z)
             if horizontalMove.Magnitude > 0 then
@@ -721,17 +731,22 @@ RunService.RenderStepped:Connect(function(deltaTime)
                 local rightSpace = root.CFrame:VectorToWorldSpace(Vector3.new(1, 0, 0))
                 local rightDot = horizontalMove.Unit:Dot(rightSpace)
                 
-                local tiltAngle = math.rad(-20) * math.clamp(dot, -1, 1)
-                local rollAngle = math.rad(-20) * math.clamp(rightDot, -1, 1)
-                FlyGyro.CFrame = CFrame.new(root.Position, root.Position + Vector3.new(look.X, 0, look.Z)) * CFrame.Angles(tiltAngle, 0, rollAngle)
+                local tiltAngle = math.rad(-15) * math.clamp(dot, -1, 1)
+                local rollAngle = math.rad(-15) * math.clamp(rightDot, -1, 1)
+                
+                FlyTargetCFrame = CFrame.new(newPos, newPos + Vector3.new(look.X, 0, look.Z)) * CFrame.Angles(tiltAngle, 0, rollAngle)
             else
-                FlyGyro.CFrame = CFrame.new(root.Position, root.Position + Vector3.new(look.X, 0, look.Z))
+                FlyTargetCFrame = CFrame.new(newPos, newPos + Vector3.new(look.X, 0, look.Z))
             end
         else
             if AnimationTrack then AnimationTrack:AdjustSpeed(0) end
-            FlyVelocity.VectorVelocity = Vector3.zero
-            FlyGyro.CFrame = CFrame.new(root.Position, root.Position + Vector3.new(look.X, 0, look.Z))
+            FlyTargetCFrame = CFrame.new(targetCFrame.Position, targetCFrame.Position + Vector3.new(look.X, 0, look.Z))
         end
+        
+        -- Framerate independent linear interpolation (Lerp) for supreme smoothness
+        root.CFrame = root.CFrame:Lerp(FlyTargetCFrame, math.clamp(18 * deltaTime, 0, 1))
+        root.AssemblyLinearVelocity = Vector3.zero
+        root.AssemblyAngularVelocity = Vector3.zero
     end
     
     if Config.Invisible and DronePosition and root then
