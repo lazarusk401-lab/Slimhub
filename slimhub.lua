@@ -4,7 +4,6 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CoreGui = game:GetService("CoreGui")
 
 local Player = Players.LocalPlayer
@@ -16,42 +15,23 @@ local Config = {
     Noclip = false,
     SpeedHack = false,
     InfiniteJump = false,
-    ClickTP = false,
-    Invisible = false,
-    ESPEnabled = false,
-    ESPTracers = false,
-    ESPNames = true,
-    ESPRainbow = false,
-    SilentAim = false,
-    SilentAimFOV = 150,
-    SilentAimTeamCheck = true,
-    SilentAimWallCheck = false,
-    SilentAimHitbox = "Head",
-    SilentAimSmoothness = 0,
-    FlySpeed = 50,
-    HackSpeed = 100,
-    DroneSpeed = 45,
-    MenuKeybind = Enum.KeyCode.RightShift,
-    FlyKeybind = nil,
-    NoclipKeybind = nil,
-    SpeedKeybind = nil,
     IsMinimized = false,
     MenuOpen = true,
-    ActiveTab = "Main"
+    ActiveTab = "Main",
+    MenuKeybind = Enum.KeyCode.RightShift,
+    FlySpeed = 50,
+    HackSpeed = 100
 }
 
 -- State
-local ESPObjects = {}
 local ToggleCallbacks = {}
 local MainDragging = false
 local TrayDragging = false
 local DragStart = nil
 local StartPos = nil
-local DroneNode = nil
-local SavedPosition = nil
 local IsTweeningMin = false
 
--- Liquid State & Trail Settings
+-- Liquid State Settings
 local LastTrayPos = Vector2.new(0,0)
 local DragDistance = 0
 local BaseSize = 52
@@ -142,7 +122,7 @@ ContentArea.BackgroundTransparency = 1
 ContentArea.Parent = MainFrame
 
 -- ====================================================================
--- TRUE LIQUID TRAY FRAME (FIXED: Swapped out Button to kill clicks)
+-- LIQUID TRAY FRAME (No Trails)
 -- ====================================================================
 local TrayBtn = Instance.new("Frame")
 MainFrame.ClipsDescendants = true
@@ -172,36 +152,6 @@ TrayLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
 TrayLabel.ZIndex = 11
 TrayLabel.Parent = TrayBtn
 
--- ULTRA LIQUID STREAMING SYSTEM (Metaball Accumulation Effect)
-local function SpawnLiquidTrail(position, velocity, currentSize)
-    -- Tail sizing drops based on frame's current squish state to seem connected
-    local targetRadius = math.clamp(currentSize.X * 0.75, 12, 38)
-    
-    local Node = Instance.new("Frame")
-    Node.Size = UDim2.fromOffset(targetRadius, targetRadius)
-    Node.Position = position
-    Node.AnchorPoint = Vector2.new(0.5, 0.5)
-    Node.BackgroundColor3 = Color3.fromRGB(0, 255, 150)
-    -- Saturated transparency overlay mimics fluid density
-    Node.BackgroundTransparency = 0.35
-    Node.BorderSizePixel = 0
-    Node.ZIndex = 9
-    Node.Parent = Gui
-
-    Instance.new("UICorner", Node).CornerRadius = UDim.new(1, 0)
-
-    -- Near-instant melting decay profile
-    local Info = TweenInfo.new(0.18, Enum.EasingStyle.Circular, Enum.EasingDirection.In)
-    local T = TweenService:Create(Node, Info, {
-        Size = UDim2.fromOffset(2, 2),
-        BackgroundTransparency = 1
-    })
-    T:Play()
-    T.Completed:Connect(function()
-        Node:Destroy()
-    end)
-end
-
 -- Tabs & Module builders
 local Tabs = {}
 local function CreateTab(name)
@@ -222,9 +172,6 @@ local function CreateTab(name)
 end
 
 CreateTab("Main")
-CreateTab("ESP")
-CreateTab("Prison")
-CreateTab("Settings")
 Tabs.Main.Visible = true
 
 local TabButtons = {}
@@ -259,23 +206,9 @@ local function CreateTabButton(name)
     Label.Parent = Btn
     
     TabButtons[name] = {Btn = Btn, Indicator = Indicator, Label = Label}
-    
-    Btn.MouseButton1Click:Connect(function()
-        Config.ActiveTab = name
-        for n, t in pairs(Tabs) do t.Visible = n == name end
-        for n, data in pairs(TabButtons) do
-            local active = n == name
-            data.Indicator.Visible = active
-            data.Label.TextColor3 = active and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(140, 140, 150)
-            data.Btn.BackgroundColor3 = active and Color3.fromRGB(28, 28, 36) or Color3.fromRGB(15, 15, 19)
-        end
-    end)
 end
 
 CreateTabButton("Main")
-CreateTabButton("ESP")
-CreateTabButton("Prison")
-CreateTabButton("Settings")
 
 local function CreateSection(parent, title)
     local Section = Instance.new("Frame")
@@ -513,7 +446,7 @@ end
 MinBtn.MouseButton1Click:Connect(ToggleMinimize)
 
 -- ====================================================================
--- DRAG ENGINE & EXCLUSIVE ACCURATE CLICK PARSER
+-- DRAG ENGINE & INPUT HANDLING
 -- ====================================================================
 TopBar.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -528,7 +461,7 @@ TrayBtn.InputBegan:Connect(function(input)
         TrayDragging = true
         DragStart = input.Position
         StartPos = TrayBtn.Position
-        DragDistance = 0 -- Clear tracking values
+        DragDistance = 0
     end
 end)
 
@@ -549,11 +482,11 @@ UIS.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         if TrayDragging then
             TrayDragging = false
-            -- STRICT DISCRIMINATION: Only expand if the user performed a clean, isolated tap click
+            -- Check drag distance to differentiate between a click vs a drag
             if DragDistance < 6 then
                 ToggleMinimize()
             else
-                -- Snap back to liquid rest shape cleanly
+                -- Snap back to normal proportions immediately on release
                 TweenService:Create(TrayBtn, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
                     Size = UDim2.fromOffset(BaseSize, BaseSize)
                 }):Play()
@@ -577,7 +510,7 @@ UIS.InputBegan:Connect(function(input, gameProcessed)
 end)
 
 -- ====================================================================
--- REALTIME LIQUEFY PHYSICS PROCESSING LOOP
+-- REALTIME LIQUEFY PHYSICS PROCESSING LOOP (No Trails)
 -- ====================================================================
 RunService.RenderStepped:Connect(function()
     if Config.IsMinimized and TrayBtn.Visible then
@@ -586,12 +519,7 @@ RunService.RenderStepped:Connect(function()
         local speed = rawVelocity.Magnitude
         
         if speed > 0.1 then
-            -- 1. Overlapping Streamline Liquid Particle Generator
-            if speed > 1.5 then
-                SpawnLiquidTrail(UDim2.fromOffset(currentCenter.X, currentCenter.Y), speed, TrayBtn.AbsoluteSize)
-            end
-            
-            -- 2. Organic Vector Elastic Deformation Physics
+            -- Dynamic Vector Elastic Deformation Physics (Jelly/Liquid Stretch)
             local stretchFactor = math.clamp(1 + (speed / 35), 1, 1.5)
             local squeezeFactor = math.clamp(1 - (speed / 55), 0.5, 1)
             
@@ -601,7 +529,7 @@ RunService.RenderStepped:Connect(function()
                 TrayBtn.Size = UDim2.fromOffset(BaseSize * squeezeFactor, BaseSize * stretchFactor)
             end
         else
-            -- Smooth, continuous snap structural normalization
+            -- Smooth, continuous snap structural normalization back to circle
             if not TrayDragging then
                 TrayBtn.Size = TrayBtn.Size:Lerp(UDim2.fromOffset(BaseSize, BaseSize), 0.2)
             end
