@@ -1,3 +1,5 @@
+-- Reset load guard to allow re-execution
+pcall(function() getgenv().IY_LOADED = nil end)
 if IY_LOADED and not _G.IY_DEBUG then
 	-- error("Infinite Yield is already running!", 0)
 	return
@@ -433,7 +435,7 @@ Cmdbar.BackgroundTransparency = 0
 Cmdbar.BorderSizePixel = 0
 Cmdbar.Position = UDim2.new(0, 8, 0, 38)
 Cmdbar.Size = UDim2.new(1, -16, 0, 22)
-Cmdbar.Font = Enum.Font.GothamMedium
+Cmdbar.Font = Enum.Font.Gotham
 Cmdbar.TextSize = 13
 Cmdbar.TextXAlignment = Enum.TextXAlignment.Left
 Cmdbar.TextColor3 = Color3.fromRGB(220, 220, 220)
@@ -523,7 +525,7 @@ Prefix.BorderSizePixel = 0
 Prefix.BackgroundTransparency = 1
 Prefix.Position = UDim2.new(0, 5, 0, 5)
 Prefix.Size = UDim2.new(1, -10, 0, 22)
-Prefix.Font = Enum.Font.GothamMedium
+Prefix.Font = Enum.Font.Gotham
 Prefix.TextSize = 12
 Prefix.Text = "Prefix"
 Prefix.TextColor3 = Color3.fromRGB(210, 210, 210)
@@ -581,7 +583,7 @@ function makeSettingsButton(name,iconID,off)
 	label.Text = name
 	label.Position = UDim2.new(0,28,0,0)
 	label.Size = UDim2.new(1,-28,1,0)
-	label.Font = Enum.Font.GothamMedium
+	label.Font = Enum.Font.Gotham
 	label.TextColor3 = Color3.fromRGB(210, 210, 210)
 	label.TextSize = 12
 	label.ZIndex = 10
@@ -616,7 +618,7 @@ StayOpen.BorderSizePixel = 0
 StayOpen.BackgroundTransparency = 1
 StayOpen.Position = UDim2.new(0, 5, 0, 32)
 StayOpen.Size = UDim2.new(1, -10, 0, 22)
-StayOpen.Font = Enum.Font.GothamMedium
+StayOpen.Font = Enum.Font.Gotham
 StayOpen.TextSize = 12
 StayOpen.Text = "Keep Menu Open"
 StayOpen.TextColor3 = Color3.fromRGB(210, 210, 210)
@@ -726,7 +728,7 @@ Text_2.BackgroundTransparency = 1
 Text_2.BorderSizePixel = 0
 Text_2.Position = UDim2.new(0, 8, 0, 27)
 Text_2.Size = UDim2.new(1, -16, 0, 70)
-Text_2.Font = Enum.Font.GothamMedium
+Text_2.Font = Enum.Font.Gotham
 Text_2.TextSize = 12
 Text_2.Text = "Notification Text"
 Text_2.TextColor3 = Color3.fromRGB(200, 200, 200)
