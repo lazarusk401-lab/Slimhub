@@ -5,7 +5,7 @@ if IY_LOADED and not _G.IY_DEBUG then
 	return
 end
 
-pcall(function() getgenv().IY_LOADED = true end)
+pcall(function() getgenv().IY_LOADED = true end
 if not game:IsLoaded() then game.Loaded:Wait() end
 
 function missing(t, f, fallback)
