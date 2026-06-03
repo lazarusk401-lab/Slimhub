@@ -1,8 +1,8 @@
-if SLIM_LOADED and not _G.SLIM_DEBUG then
+if FF_LOADED and not _G.FF_DEBUG then
 	return
 end
 
-pcall(function() getgenv().SLIM_LOADED = true end)
+pcall(function() getgenv().FF_LOADED = true end)
 if not game:IsLoaded() then game.Loaded:Wait() end
 
 function missing(t, f, fallback)
@@ -100,19 +100,19 @@ end, function()
 end)
 isLegacyChat = TextChatService.ChatVersion == Enum.ChatVersion.LegacyChatService
 
-local slimassets = {
-	["slimhub/assets/bindsandplugins.png"] = "rbxassetid://5147695474",
-	["slimhub/assets/close.png"] = "rbxassetid://5054663650",
-	["slimhub/assets/editaliases.png"] = "rbxassetid://5147488658",
-	["slimhub/assets/editkeybinds.png"] = "rbxassetid://129697930",
-	["slimhub/assets/edittheme.png"] = "rbxassetid://4911962991",
-	["slimhub/assets/editwaypoints.png"] = "rbxassetid://5147488592",
-	["slimhub/assets/imgstudiopluginlogo.png"] = "rbxassetid://4113050383",
-	["slimhub/assets/logo.png"] = "rbxassetid://1352543873",
-	["slimhub/assets/minimize.png"] = "rbxassetid://2406617031",
-	["slimhub/assets/pin.png"] = "rbxassetid://6234691350",
-	["slimhub/assets/reference.png"] = "rbxassetid://3523243755",
-	["slimhub/assets/settings.png"] = "rbxassetid://1204397029"
+local ffassets = {
+	["ffhub/assets/bindsandplugins.png"] = "rbxassetid://5147695474",
+	["ffhub/assets/close.png"] = "rbxassetid://5054663650",
+	["ffhub/assets/editaliases.png"] = "rbxassetid://5147488658",
+	["ffhub/assets/editkeybinds.png"] = "rbxassetid://129697930",
+	["ffhub/assets/edittheme.png"] = "rbxassetid://4911962991",
+	["ffhub/assets/editwaypoints.png"] = "rbxassetid://5147488592",
+	["ffhub/assets/imgstudiopluginlogo.png"] = "rbxassetid://4113050383",
+	["ffhub/assets/logo.png"] = "rbxassetid://1352543873",
+	["ffhub/assets/minimize.png"] = "rbxassetid://2406617031",
+	["ffhub/assets/pin.png"] = "rbxassetid://6234691350",
+	["ffhub/assets/reference.png"] = "rbxassetid://3523243755",
+	["ffhub/assets/settings.png"] = "rbxassetid://1204397029"
 }
 
 local function getcustomasset(asset)
@@ -124,24 +124,23 @@ local function getcustomasset(asset)
 			return result
 		end
 	end
-	return slimassets[asset]
+	return ffassets[asset]
 end
 
 if makefolder and isfolder and writefile and isfile then
 	pcall(function()
 		local assets = "https://raw.githubusercontent.com/infyiff/backup/refs/heads/main/"
-		for _, folder in {"slimhub", "slimhub/assets"} do
+		for _, folder in {"ffhub", "ffhub/assets"} do
 			if not isfolder(folder) then
 				makefolder(folder)
 			end
 		end
-		for path in slimassets do
+		for path in ffassets do
 			if not isfile(path) then
-				local legacyPath = path:gsub("slimhub/", "infiniteyield/")
-				writefile(path, game:HttpGet((legacyPath:gsub("infiniteyield/", assets))))
+				writefile(path, game:HttpGet((path:gsub("ffhub/", assets))))
 			end
 		end
-		if IsOnMobile then writefile("slimhub/assets/.nomedia", "") end
+		if IsOnMobile then writefile("ffhub/assets/.nomedia", "") end
 	end)
 end
 
@@ -335,7 +334,7 @@ Scale.Name = randomString()
 Holder.Name = randomString()
 Holder.Parent = ScaledHolder
 Holder.Active = true
-Holder.BackgroundColor3 = Color3.fromRGB(20, 20, 22) -- Slate dark theme adjustment
+Holder.BackgroundColor3 = Color3.fromRGB(30, 30, 35) -- Updated theme color
 Holder.BorderSizePixel = 0
 Holder.Position = UDim2.new(1, -250, 1, -220)
 Holder.Size = UDim2.new(0, 250, 0, 220)
@@ -345,13 +344,14 @@ table.insert(shade2,Holder)
 Title.Name = "Title"
 Title.Parent = Holder
 Title.Active = true
-Title.BackgroundColor3 = Color3.fromRGB(15, 15, 17)
+Title.BackgroundColor3 = Color3.fromRGB(20, 20, 25) -- Updated header color
 Title.BorderSizePixel = 0
 Title.Size = UDim2.new(0, 250, 0, 20)
 Title.Font = Enum.Font.SourceSansBold
-Title.TextSize = 14
-Title.Text = "SlimHub Systems v" .. currentVersion
-Title.TextColor3 = Color3.new(1, 1, 1)
+Title.TextSize = 18
+Title.Text = "FF-hub // FastForward Hub v" .. currentVersion
+
+Title.TextColor3 = Color3.fromRGB(255, 60, 60) -- Styled title red/bright accent for branding
 Title.ZIndex = 10
 table.insert(shade1,Title)
 table.insert(text1,Title)
@@ -359,7 +359,7 @@ table.insert(text1,Title)
 Dark.Name = "Dark"
 Dark.Parent = Holder
 Dark.Active = true
-Dark.BackgroundColor3 = Color3.fromRGB(15, 15, 17)
+Dark.BackgroundColor3 = Color3.fromRGB(22, 22, 26)
 Dark.BorderSizePixel = 0
 Dark.Position = UDim2.new(0, 0, 0, 45)
 Dark.Size = UDim2.new(0, 250, 0, 175)
@@ -373,12 +373,12 @@ Cmdbar.BorderSizePixel = 0
 Cmdbar.Position = UDim2.new(0, 5, 0, 20)
 Cmdbar.Size = UDim2.new(0, 240, 0, 25)
 Cmdbar.Font = Enum.Font.SourceSans
-Cmdbar.TextSize = 16
+Cmdbar.TextSize = 18
 Cmdbar.TextXAlignment = Enum.TextXAlignment.Left
 Cmdbar.TextColor3 = Color3.new(1, 1, 1)
 Cmdbar.Text = ""
 Cmdbar.ZIndex = 10
-Cmdbar.PlaceholderText = "Type system command..."
+Cmdbar.PlaceholderText = "FF-hub Terminal Input"
 
 CMDsF.Name = "CMDs"
 CMDsF.Parent = Holder
@@ -386,11 +386,11 @@ CMDsF.BackgroundTransparency = 1
 CMDsF.BorderSizePixel = 0
 CMDsF.Position = UDim2.new(0, 5, 0, 45)
 CMDsF.Size = UDim2.new(0, 245, 0, 175)
-CMDsF.ScrollBarImageColor3 = Color3.fromRGB(45, 45, 50)
+CMDsF.ScrollBarImageColor3 = Color3.fromRGB(50, 50, 55)
 CMDsF.BottomImage = "rbxasset://textures/ui/Scroll/scroll-middle.png"
 CMDsF.CanvasSize = UDim2.new(0, 0, 0, 0)
 CMDsF.MidImage = "rbxasset://textures/ui/Scroll/scroll-middle.png"
-CMDsF.ScrollBarThickness = 6
+CMDsF.ScrollBarThickness = 8
 CMDsF.TopImage = "rbxasset://textures/ui/Scroll/scroll-middle.png"
 CMDsF.VerticalScrollBarInset = 'Always'
 CMDsF.ZIndex = 10
@@ -403,7 +403,7 @@ SettingsButton.Parent = Holder
 SettingsButton.BackgroundTransparency = 1
 SettingsButton.Position = UDim2.new(0, 230, 0, 0)
 SettingsButton.Size = UDim2.new(0, 20, 0, 20)
-SettingsButton.Image = getcustomasset("slimhub/assets/settings.png")
+SettingsButton.Image = getcustomasset("ffhub/assets/settings.png")
 SettingsButton.ZIndex = 10
 
 ReferenceButton = Instance.new("ImageButton")
@@ -412,13 +412,13 @@ ReferenceButton.Parent = Holder
 ReferenceButton.BackgroundTransparency = 1
 ReferenceButton.Position = UDim2.new(0, 212, 0, 2)
 ReferenceButton.Size = UDim2.new(0, 16, 0, 16)
-ReferenceButton.Image = getcustomasset("slimhub/assets/reference.png")
+ReferenceButton.Image = getcustomasset("ffhub/assets/reference.png")
 ReferenceButton.ZIndex = 10
 
 Settings.Name = "Settings"
 Settings.Parent = Holder
 Settings.Active = true
-Settings.BackgroundColor3 = Color3.fromRGB(15, 15, 17)
+Settings.BackgroundColor3 = Color3.fromRGB(22, 22, 26)
 Settings.BorderSizePixel = 0
 Settings.Position = UDim2.new(0, 0, 0, 220)
 Settings.Size = UDim2.new(0, 250, 0, 175)
@@ -431,11 +431,11 @@ SettingsHolder.Parent = Settings
 SettingsHolder.BackgroundTransparency = 1
 SettingsHolder.BorderSizePixel = 0
 SettingsHolder.Size = UDim2.new(1,0,1,0)
-SettingsHolder.ScrollBarImageColor3 = Color3.fromRGB(45, 45, 50)
+SettingsHolder.ScrollBarImageColor3 = Color3.fromRGB(50, 50, 55)
 SettingsHolder.BottomImage = "rbxasset://textures/ui/Scroll/scroll-middle.png"
 SettingsHolder.CanvasSize = UDim2.new(0, 0, 0, 235)
 SettingsHolder.MidImage = "rbxasset://textures/ui/Scroll/scroll-middle.png"
-SettingsHolder.ScrollBarThickness = 6
+SettingsHolder.ScrollBarThickness = 8
 SettingsHolder.TopImage = "rbxasset://textures/ui/Scroll/scroll-middle.png"
 SettingsHolder.VerticalScrollBarInset = 'Always'
 SettingsHolder.ZIndex = 10
@@ -443,14 +443,14 @@ table.insert(scroll,SettingsHolder)
 
 Prefix.Name = "Prefix"
 Prefix.Parent = SettingsHolder
-Prefix.BackgroundColor3 = Color3.fromRGB(25, 25, 28)
+Prefix.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 Prefix.BorderSizePixel = 0
 Prefix.BackgroundTransparency = 1
 Prefix.Position = UDim2.new(0, 5, 0, 5)
 Prefix.Size = UDim2.new(1, -10, 0, 20)
 Prefix.Font = Enum.Font.SourceSans
 Prefix.TextSize = 14
-Prefix.Text = "Command Prefix"
+Prefix.Text = "Prefix"
 Prefix.TextColor3 = Color3.new(1, 1, 1)
 Prefix.TextXAlignment = Enum.TextXAlignment.Left
 Prefix.ZIndex = 10
@@ -459,21 +459,21 @@ table.insert(text1,Prefix)
 
 PrefixBox.Name = "PrefixBox"
 PrefixBox.Parent = Prefix
-PrefixBox.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+PrefixBox.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
 PrefixBox.BorderSizePixel = 0
 PrefixBox.Position = UDim2.new(1, -20, 0, 0)
 PrefixBox.Size = UDim2.new(0, 20, 0, 20)
 PrefixBox.Font = Enum.Font.SourceSansBold
 PrefixBox.TextSize = 14
 PrefixBox.Text = ''
-PrefixBox.TextColor3 = Color3.new(1, 1, 1)
+PrefixBox.TextColor3 = Color3.new(0, 0, 0)
 PrefixBox.ZIndex = 10
 table.insert(shade3,PrefixBox)
 table.insert(text2,PrefixBox)
 
 function makeSettingsButton(name,iconID,off)
 	local button = Instance.new("TextButton")
-	button.BackgroundColor3 = Color3.fromRGB(25, 25, 28)
+	button.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 	button.BorderSizePixel = 0
 	button.Position = UDim2.new(0,0,0,0)
 	button.Size = UDim2.new(1,0,0,25)
@@ -509,19 +509,19 @@ function makeSettingsButton(name,iconID,off)
 	return button
 end
 
-ColorsButton = makeSettingsButton("Edit Theme Layout",getcustomasset("slimhub/assets/edittheme.png"))
+ColorsButton = makeSettingsButton("Edit Theme",getcustomasset("ffhub/assets/edittheme.png"))
 ColorsButton.Position = UDim2.new(0, 5, 0, 55)
 ColorsButton.Size = UDim2.new(1, -10, 0, 25)
 ColorsButton.Name = "Colors"
 ColorsButton.Parent = SettingsHolder
 
-Keybinds = makeSettingsButton("Configure Macro Binds",getcustomasset("slimhub/assets/editkeybinds.png"))
+Keybinds = makeSettingsButton("Edit Keybinds",getcustomasset("ffhub/assets/editkeybinds.png"))
 Keybinds.Position = UDim2.new(0, 5, 0, 85)
 Keybinds.Size = UDim2.new(1, -10, 0, 25)
 Keybinds.Name = "Keybinds"
 Keybinds.Parent = SettingsHolder
 
-Aliases = makeSettingsButton("Configure Aliases",getcustomasset("slimhub/assets/editaliases.png"))
+Aliases = makeSettingsButton("Edit Aliases",getcustomasset("ffhub/assets/editaliases.png"))
 Aliases.Position = UDim2.new(0, 5, 0, 115)
 Aliases.Size = UDim2.new(1, -10, 0, 25)
 Aliases.Name = "Aliases"
@@ -529,14 +529,14 @@ Aliases.Parent = SettingsHolder
 
 StayOpen.Name = "StayOpen"
 StayOpen.Parent = SettingsHolder
-StayOpen.BackgroundColor3 = Color3.fromRGB(25, 25, 28)
+StayOpen.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 StayOpen.BorderSizePixel = 0
 StayOpen.BackgroundTransparency = 1
 StayOpen.Position = UDim2.new(0, 5, 0, 30)
 StayOpen.Size = UDim2.new(1, -10, 0, 20)
 StayOpen.Font = Enum.Font.SourceSans
 StayOpen.TextSize = 14
-StayOpen.Text = "Pin Console Menu"
+StayOpen.Text = "Keep Menu Open"
 StayOpen.TextColor3 = Color3.new(1, 1, 1)
 StayOpen.TextXAlignment = Enum.TextXAlignment.Left
 StayOpen.ZIndex = 10
@@ -545,7 +545,7 @@ table.insert(text1,StayOpen)
 
 Button.Name = "Button"
 Button.Parent = StayOpen
-Button.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+Button.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
 Button.BorderSizePixel = 0
 Button.Position = UDim2.new(1, -20, 0, 0)
 Button.Size = UDim2.new(0, 20, 0, 20)
@@ -554,28 +554,30 @@ table.insert(shade3,Button)
 
 On.Name = "On"
 On.Parent = Button
-On.BackgroundColor3 = Color3.fromRGB(100, 100, 105)
+On.BackgroundColor3 = Color3.fromRGB(120, 120, 125)
 On.BackgroundTransparency = 1
 On.BorderSizePixel = 0
 On.Position = UDim2.new(0, 2, 0, 2)
 On.Size = UDim2.new(0, 16, 0, 16)
 On.Font = Enum.Font.SourceSans
+On.FontSize = Enum.FontSize.Size14
 On.Text = ""
+On.TextColor3 = Color3.new(0, 0, 0)
 On.ZIndex = 10
 
-Positions = makeSettingsButton("Navigation Waypoints",getcustomasset("slimhub/assets/editwaypoints.png"))
+Positions = makeSettingsButton("Edit/Goto Waypoints",getcustomasset("ffhub/assets/editwaypoints.png"))
 Positions.Position = UDim2.new(0, 5, 0, 145)
 Positions.Size = UDim2.new(1, -10, 0, 25)
 Positions.Name = "Waypoints"
 Positions.Parent = SettingsHolder
 
-EventBind = makeSettingsButton("Automation Engines",getcustomasset("slimhub/assets/bindsandplugins.png"),759)
+EventBind = makeSettingsButton("Edit Event Binds",getcustomasset("ffhub/assets/bindsandplugins.png"),759)
 EventBind.Position = UDim2.new(0, 5, 0, 205)
 EventBind.Size = UDim2.new(1, -10, 0, 25)
 EventBind.Name = "EventBinds"
 EventBind.Parent = SettingsHolder
 
-Plugins = makeSettingsButton("Extension Manager",getcustomasset("slimhub/assets/bindsandplugins.png"),743)
+Plugins = makeSettingsButton("Manage Plugins",getcustomasset("ffhub/assets/bindsandplugins.png"),743)
 Plugins.Position = UDim2.new(0, 5, 0, 175)
 Plugins.Size = UDim2.new(1, -10, 0, 25)
 Plugins.Name = "Plugins"
@@ -588,7 +590,7 @@ Example.BorderSizePixel = 0
 Example.Size = UDim2.new(0, 190, 0, 20)
 Example.Visible = false
 Example.Font = Enum.Font.SourceSans
-Example.TextSize = 16
+Example.TextSize = 18
 Example.Text = "Example"
 Example.TextColor3 = Color3.new(1, 1, 1)
 Example.TextXAlignment = Enum.TextXAlignment.Left
@@ -597,7 +599,7 @@ table.insert(text1,Example)
 
 Notification.Name = randomString()
 Notification.Parent = ScaledHolder
-Notification.BackgroundColor3 = Color3.fromRGB(15, 15, 17)
+Notification.BackgroundColor3 = Color3.fromRGB(22, 22, 26)
 Notification.BorderSizePixel = 0
 Notification.Position = UDim2.new(1, -500, 1, 20)
 Notification.Size = UDim2.new(0, 250, 0, 100)
@@ -606,12 +608,12 @@ table.insert(shade1,Notification)
 
 Title_2.Name = "Title"
 Title_2.Parent = Notification
-Title_2.BackgroundColor3 = Color3.fromRGB(25, 25, 28)
+Title_2.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 Title_2.BorderSizePixel = 0
 Title_2.Size = UDim2.new(0, 250, 0, 20)
-Title_2.Font = Enum.Font.SourceSansBold
+Title_2.Font = Enum.Font.SourceSans
 Title_2.TextSize = 14
-Title_2.Text = "Notification"
+Title_2.Text = "FF-hub Alert"
 Title_2.TextColor3 = Color3.new(1, 1, 1)
 Title_2.ZIndex = 10
 table.insert(shade2,Title_2)
@@ -624,8 +626,8 @@ Text_2.BorderSizePixel = 0
 Text_2.Position = UDim2.new(0, 5, 0, 25)
 Text_2.Size = UDim2.new(0, 240, 0, 75)
 Text_2.Font = Enum.Font.SourceSans
-Text_2.TextSize = 14
-Text_2.Text = "System alert contents..."
+Text_2.TextSize = 16
+Text_2.Text = "Alert system active."
 Text_2.TextColor3 = Color3.new(1, 1, 1)
 Text_2.TextWrapped = true
 Text_2.ZIndex = 10
@@ -644,7 +646,7 @@ CloseImage.BackgroundColor3 = Color3.new(1, 1, 1)
 CloseImage.BackgroundTransparency = 1
 CloseImage.Position = UDim2.new(0, 5, 0, 5)
 CloseImage.Size = UDim2.new(0, 10, 0, 10)
-CloseImage.Image = getcustomasset("slimhub/assets/close.png")
+CloseImage.Image = getcustomasset("ffhub/assets/close.png")
 CloseImage.ZIndex = 10
 
 PinButton.Name = "PinButton"
@@ -660,13 +662,13 @@ PinImage.BackgroundTransparency = 1
 PinImage.Position = UDim2.new(0, 3, 0, 3)
 PinImage.Size = UDim2.new(0, 14, 0, 14)
 PinImage.ZIndex = 10
-PinImage.Image = getcustomasset("slimhub/assets/pin.png")
+PinImage.Image = getcustomasset("ffhub/assets/pin.png")
 
 Tooltip.Name = randomString()
 Tooltip.Parent = ScaledHolder
 Tooltip.Active = true
-Tooltip.BackgroundColor3 = Color3.fromRGB(15, 15, 17)
-Tooltip.BackgroundTransparency = 0.15
+Tooltip.BackgroundColor3 = Color3.fromRGB(22, 22, 26)
+Tooltip.BackgroundTransparency = 0.1
 Tooltip.BorderSizePixel = 0
 Tooltip.Size = UDim2.new(0, 200, 0, 96)
 Tooltip.Visible = false
@@ -675,14 +677,15 @@ table.insert(shade1,Tooltip)
 
 Title_3.Name = "Title"
 Title_3.Parent = Tooltip
-Title_3.BackgroundColor3 = Color3.fromRGB(25, 25, 28)
-Title_3.BackgroundTransparency = 0.15
+Title_3.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+Title_3.BackgroundTransparency = 0.1
 Title_3.BorderSizePixel = 0
 Title_3.Size = UDim2.new(0, 200, 0, 20)
-Title_3.Font = Enum.Font.SourceSansBold
+Title_3.Font = Enum.Font.SourceSans
 Title_3.TextSize = 14
 Title_3.Text = ""
 Title_3.TextColor3 = Color3.new(1, 1, 1)
+Title_3.TextTransparency = 0.1
 Title_3.ZIndex = 10
 table.insert(shade2,Title_3)
 table.insert(text1,Title_3)
@@ -694,9 +697,10 @@ Description.BorderSizePixel = 0
 Description.Size = UDim2.new(0,180,0,72)
 Description.Position = UDim2.new(0,10,0,18)
 Description.Font = Enum.Font.SourceSans
-Description.TextSize = 14
+Description.TextSize = 16
 Description.Text = ""
 Description.TextColor3 = Color3.new(1, 1, 1)
+Description.TextTransparency = 0.1
 Description.TextWrapped = true
 Description.ZIndex = 10
 table.insert(text1,Description)
@@ -704,7 +708,7 @@ table.insert(text1,Description)
 IntroBackground.Name = "IntroBackground"
 IntroBackground.Parent = Holder
 IntroBackground.Active = true
-IntroBackground.BackgroundColor3 = Color3.fromRGB(15, 15, 17)
+IntroBackground.BackgroundColor3 = Color3.fromRGB(22, 22, 26)
 IntroBackground.BorderSizePixel = 0
 IntroBackground.Position = UDim2.new(0, 0, 0, 45)
 IntroBackground.Size = UDim2.new(0, 250, 0, 175)
@@ -716,7 +720,8 @@ Logo.BackgroundTransparency = 1
 Logo.BorderSizePixel = 0
 Logo.Position = UDim2.new(0, 125, 0, 127)
 Logo.Size = UDim2.new(0, 10, 0, 10)
-Logo.Image = getcustomasset("slimhub/assets/logo.png")
+Logo.Image = getcustomasset("ffhub/assets/logo.png")
+Logo.ImageTransparency = 0
 Logo.ZIndex = 10
 
 Credits.Name = "Credits"
@@ -726,15 +731,15 @@ Credits.BorderSizePixel = 0
 Credits.Position = UDim2.new(0, 0, 0.9, 30)
 Credits.Size = UDim2.new(0, 250, 0, 20)
 Credits.Font = Enum.Font.SourceSansLight
-Credits.TextSize = 12
-Credits.Text = "SlimHub UI Custom Environment Layout Core"
-Credits.TextColor3 = Color3.fromRGB(180, 180, 185)
+Credits.FontSize = Enum.FontSize.Size14
+Credits.Text = "FF-hub Developers // FastForward Core Team"
+Credits.TextColor3 = Color3.new(1, 1, 1)
 Credits.ZIndex = 10
 
 KeybindsFrame.Name = "KeybindsFrame"
 KeybindsFrame.Parent = Settings
 KeybindsFrame.Active = true
-KeybindsFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 17)
+KeybindsFrame.BackgroundColor3 = Color3.fromRGB(22, 22, 26)
 KeybindsFrame.BorderSizePixel = 0
 KeybindsFrame.Position = UDim2.new(0, 0, 0, 175)
 KeybindsFrame.Size = UDim2.new(0, 250, 0, 175)
@@ -743,7 +748,7 @@ table.insert(shade1,KeybindsFrame)
 
 Close.Name = "Close"
 Close.Parent = KeybindsFrame
-Close.BackgroundColor3 = Color3.fromRGB(25, 25, 28)
+Close.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 Close.BorderSizePixel = 0
 Close.Position = UDim2.new(0, 205, 0, 150)
 Close.Size = UDim2.new(0, 40, 0, 20)
@@ -757,7 +762,7 @@ table.insert(text1,Close)
 
 Add.Name = "Add"
 Add.Parent = KeybindsFrame
-Add.BackgroundColor3 = Color3.fromRGB(25, 25, 28)
+Add.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 Add.BorderSizePixel = 0
 Add.Position = UDim2.new(0, 5, 0, 150)
 Add.Size = UDim2.new(0, 40, 0, 20)
@@ -771,7 +776,7 @@ table.insert(text1,Add)
 
 Delete.Name = "Delete"
 Delete.Parent = KeybindsFrame
-Delete.BackgroundColor3 = Color3.fromRGB(25, 25, 28)
+Delete.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 Delete.BorderSizePixel = 0
 Delete.Position = UDim2.new(0, 50, 0, 150)
 Delete.Size = UDim2.new(0, 40, 0, 20)
@@ -789,7 +794,7 @@ Holder_2.BackgroundTransparency = 1
 Holder_2.BorderSizePixel = 0
 Holder_2.Position = UDim2.new(0, 0, 0, 0)
 Holder_2.Size = UDim2.new(0, 250, 0, 145)
-Holder_2.ScrollBarImageColor3 = Color3.fromRGB(45, 45, 50)
+Holder_2.ScrollBarImageColor3 = Color3.fromRGB(50, 50, 55)
 Holder_2.BottomImage = "rbxasset://textures/ui/Scroll/scroll-middle.png"
 Holder_2.CanvasSize = UDim2.new(0, 0, 0, 0)
 Holder_2.MidImage = "rbxasset://textures/ui/Scroll/scroll-middle.png"
@@ -800,7 +805,7 @@ Holder_2.ZIndex = 10
 
 Example_2.Name = "Example"
 Example_2.Parent = KeybindsFrame
-Example_2.BackgroundColor3 = Color3.fromRGB(25, 25, 28)
+Example_2.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 Example_2.BorderSizePixel = 0
 Example_2.Size = UDim2.new(0, 10, 0, 20)
 Example_2.Visible = false
@@ -809,13 +814,13 @@ table.insert(shade2,Example_2)
 
 Text_3.Name = "Text"
 Text_3.Parent = Example_2
-Text_3.BackgroundColor3 = Color3.fromRGB(25, 25, 28)
+Text_3.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 Text_3.BorderSizePixel = 0
 Text_3.Position = UDim2.new(0, 10, 0, 0)
 Text_3.Size = UDim2.new(0, 240, 0, 20)
 Text_3.Font = Enum.Font.SourceSans
 Text_3.TextSize = 14
-Text_3.Text = "Macro"
+Text_3.Text = "bind"
 Text_3.TextColor3 = Color3.new(1, 1, 1)
 Text_3.TextXAlignment = Enum.TextXAlignment.Left
 Text_3.ZIndex = 10
@@ -824,132 +829,24 @@ table.insert(text1,Text_3)
 
 Delete_2.Name = "Delete"
 Delete_2.Parent = Text_3
-Delete_2.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+Delete_2.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
 Delete_2.BorderSizePixel = 0
 Delete_2.Position = UDim2.new(0, 200, 0, 0)
 Delete_2.Size = UDim2.new(0, 40, 0, 20)
 Delete_2.Font = Enum.Font.SourceSans
 Delete_2.TextSize = 14
-Delete_2.Text = "Delete"
-Delete_2.TextColor3 = Color3.new(1, 1, 1)
-Delete_2.ZIndex = 10
+Delete_2.Text = "Remove"
 
--- Continuous Core Interface Configurations
-Cmdbar_3 = Instance.new("TextBox") 
-CreateToggle = Instance.new("TextLabel") 
-Button_2 = Instance.new("Frame") 
-On_2 = Instance.new("TextButton") 
-shadow_2 = Instance.new("Frame") 
-PopupText_2 = Instance.new("TextLabel") 
-Exit_2 = Instance.new("TextButton") 
-ExitImage_2 = Instance.new("ImageLabel") 
-PositionsFrame = Instance.new("Frame") 
-Close_3 = Instance.new("TextButton") 
-Delete_5 = Instance.new("TextButton") 
-Part = Instance.new("TextButton") 
-Holder_4 = Instance.new("ScrollingFrame") 
-Example_4 = Instance.new("Frame") 
-Text_5 = Instance.new("TextLabel") 
-Delete_6 = Instance.new("TextButton") 
-TP = Instance.new("TextButton") 
-AliasesFrame = Instance.new("Frame") 
-Close_2 = Instance.new("TextButton") 
-Delete_3 = Instance.new("TextButton") 
-Holder_3 = Instance.new("ScrollingFrame") 
-Example_3 = Instance.new("Frame")
-
-Holder_4.Name = "Holder"
-Holder_4.Parent = PositionsFrame 
-Holder_4.BackgroundTransparency = 1 
-Holder_4.BorderSizePixel = 0 
-Holder_4.Position = UDim2.new(0, 0, 0, 0) 
-Holder_4.Selectable = false 
-Holder_4.Size = UDim2.new(0, 250, 0, 145) 
-Holder_4.ScrollBarImageColor3 = Color3.fromRGB(45, 45, 50) 
-Holder_4.BottomImage = "rbxasset://textures/ui/Scroll/scroll-middle.png" 
-Holder_4.CanvasSize = UDim2.new(0, 0, 0, 0) 
-Holder_4.MidImage = "rbxasset://textures/ui/Scroll/scroll-middle.png" 
-Holder_4.ScrollBarThickness = 0 
-Holder_4.TopImage = "rbxasset://textures/ui/Scroll/scroll-middle.png" 
-Holder_4.VerticalScrollBarInset = 'Always' 
-Holder_4.ZIndex = 10 
-
-Example_4.Name = "Example" 
-Example_4.Parent = PositionsFrame 
-Example_4.BackgroundColor3 = Color3.fromRGB(25, 25, 28) 
-Example_4.BorderSizePixel = 0 
-Example_4.Size = UDim2.new(0, 10, 0, 20) 
-Example_4.Visible = false 
-Example_4.Position = UDim2.new(0, 0, 0, -5) 
-Example_4.ZIndex = 10 
-table.insert(shade2,Example_4) 
-
-Text_5.Name = "Text" 
-Text_5.Parent = Example_4 
-Text_5.BackgroundColor3 = Color3.fromRGB(25, 25, 28) 
-Text_5.BorderSizePixel = 0 
-Text_5.Position = UDim2.new(0, 10, 0, 0) 
-Text_5.Size = UDim2.new(0, 240, 0, 20) 
-Text_5.Font = Enum.Font.SourceSans 
-Text_5.TextSize = 14 
-Text_5.Text = "Position" 
-Text_5.TextColor3 = Color3.new(1, 1, 1) 
-Text_5.TextXAlignment = Enum.TextXAlignment.Left 
-Text_5.ZIndex = 10 
-table.insert(shade2,Text_5) 
-table.insert(text1,Text_5)
-
--- API Utilities & Shell Environment Mechanics
-function breakVelocity() 
-	local V3 = Vector3.new(0, 0, 0) 
-	for _, v in ipairs(Players.LocalPlayer.Character:GetDescendants()) do 
-		if v:IsA("BasePart") then 
-			v.Velocity, v.RotVelocity = V3, V3 
-		end 
-	end 
-end 
-
-function toClipboard(txt) 
-	if everyClipboard then 
-		everyClipboard(tostring(txt)) 
-		notify("System Clipboard", "Contents updated successfully") 
-	else 
-		notify("System Error", "Clipboard infrastructure is missing on this executor engine") 
-	end 
-end 
-
-function chatMessage(str) 
-	str = tostring(str) 
-	if not isLegacyChat then 
-		TextChatService.TextChannels.RBXGeneral:SendAsync(str) 
-	else 
-		ReplicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer(str, "All") 
-	end 
-end
-
-function notify(title, text)
-    Title_2.Text = title
-    Text_2.Text = text
-    Notification:TweenPosition(UDim2.new(1, -260, 1, -110), "Out", "Quart", 0.4, true)
-end
-
--- Core Window Management Loops
+-- Task loops and animations initialization
 task.spawn(function()
-    IntroBackground:TweenPosition(UDim2.new(0, 0, 0, -500), "InOut", "Quart", 0.5, true)
-    task.wait(0.6)
-    IntroBackground:Destroy()
+	task.wait(1)
+	if IntroBackground and IntroBackground.Parent then
+		IntroBackground:TweenPosition(UDim2.new(0, 0, 0, -500), "InOut", "Quart", 0.5, true, nil)
+	end
+	if Logo and Logo.Parent then
+		Logo:TweenPosition(UDim2.new(0, 125, 0, -500), "InOut", "Quart", 0.5, true, nil)
+	end
+	task.wait(0.6)
+	if IntroBackground then IntroBackground:Destroy() end
+	if Logo then Logo:Destroy() end
 end)
-
-SettingsButton.MouseButton1Click:Connect(function() 
-	if SettingsOpen == false then 
-		SettingsOpen = true 
-		Settings:TweenPosition(UDim2.new(0, 0, 0, 45), "InOut", "Quart", 0.5, true, nil) 
-		CMDsF.Visible = false 
-	else 
-		SettingsOpen = false 
-		CMDsF.Visible = true 
-		Settings:TweenPosition(UDim2.new(0, 0, 0, 220), "InOut", "Quart", 0.5, true, nil) 
-	end 
-end)
-
-print("SlimHub Layout initialization successfully mapped without structural legacy references.")
