@@ -339,22 +339,44 @@ Scale.Name = randomString()
 Holder.Name = randomString()
 Holder.Parent = ScaledHolder
 Holder.Active = true
-Holder.BackgroundColor3 = Color3.fromRGB(46, 46, 47)
+Holder.BackgroundColor3 = Color3.fromRGB(24, 24, 30)
 Holder.BorderSizePixel = 0
-Holder.Position = UDim2.new(1, -250, 1, -220)
-Holder.Size = UDim2.new(0, 250, 0, 220)
+Holder.Position = UDim2.new(0, -250, 0.5, -135)
+Holder.Size = UDim2.new(0, 250, 0, 270)
 Holder.ZIndex = 10
+Holder.ClipsDescendants = true
+
+local _holderCorner = Instance.new("UICorner")
+_holderCorner.CornerRadius = UDim.new(0, 8)
+_holderCorner.Parent = Holder
+
+local _holderStroke = Instance.new("UIStroke")
+_holderStroke.Thickness = 1
+_holderStroke.Color = Color3.fromRGB(45, 45, 55)
+_holderStroke.Parent = Holder
+
 table.insert(shade2,Holder)
 
 Title.Name = "Title"
 Title.Parent = Holder
 Title.Active = true
-Title.BackgroundColor3 = Color3.fromRGB(36,36,37)
+Title.BackgroundColor3 = Color3.fromRGB(30, 30, 38)
 Title.BorderSizePixel = 0
-Title.Size = UDim2.new(0, 250, 0, 20)
-Title.Font = Enum.Font.SourceSans
-Title.TextSize = 18
-Title.Text = "Infinite Yield FE v" .. currentVersion
+Title.Size = UDim2.new(1, 0, 0, 35)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 14
+Title.Text = "IY v" .. currentVersion
+
+local _titleCornerTop = Instance.new("UICorner")
+_titleCornerTop.CornerRadius = UDim.new(0, 8)
+_titleCornerTop.Parent = Title
+
+local _titleCapFill = Instance.new("Frame")
+_titleCapFill.Size = UDim2.new(1, 0, 0, 8)
+_titleCapFill.Position = UDim2.new(0, 0, 1, -8)
+_titleCapFill.BackgroundColor3 = Color3.fromRGB(30, 30, 38)
+_titleCapFill.BorderSizePixel = 0
+_titleCapFill.Parent = Title
 
 do
 	local emoji = ({
@@ -386,7 +408,10 @@ do
 	end
 end
 
-Title.TextColor3 = Color3.new(1, 1, 1)
+Title.TextColor3 = Color3.fromRGB(0, 180, 255)
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Position = UDim2.new(0, 12, 0, 0)
+Title.BackgroundTransparency = 0
 Title.ZIndex = 10
 table.insert(shade1,Title)
 table.insert(text1,Title)
@@ -394,38 +419,53 @@ table.insert(text1,Title)
 Dark.Name = "Dark"
 Dark.Parent = Holder
 Dark.Active = true
-Dark.BackgroundColor3 = Color3.fromRGB(36, 36, 37)
+Dark.BackgroundColor3 = Color3.fromRGB(24, 24, 30)
 Dark.BorderSizePixel = 0
-Dark.Position = UDim2.new(0, 0, 0, 45)
-Dark.Size = UDim2.new(0, 250, 0, 175)
+Dark.Position = UDim2.new(0, 0, 0, 60)
+Dark.Size = UDim2.new(1, 0, 1, -60)
 Dark.ZIndex = 10
 table.insert(shade1,Dark)
 
 Cmdbar.Name = "Cmdbar"
 Cmdbar.Parent = Holder
-Cmdbar.BackgroundTransparency = 1
+Cmdbar.BackgroundColor3 = Color3.fromRGB(32, 32, 40)
+Cmdbar.BackgroundTransparency = 0
 Cmdbar.BorderSizePixel = 0
-Cmdbar.Position = UDim2.new(0, 5, 0, 20)
-Cmdbar.Size = UDim2.new(0, 240, 0, 25)
-Cmdbar.Font = Enum.Font.SourceSans
-Cmdbar.TextSize = 18
+Cmdbar.Position = UDim2.new(0, 8, 0, 38)
+Cmdbar.Size = UDim2.new(1, -16, 0, 22)
+Cmdbar.Font = Enum.Font.GothamMedium
+Cmdbar.TextSize = 13
 Cmdbar.TextXAlignment = Enum.TextXAlignment.Left
-Cmdbar.TextColor3 = Color3.new(1, 1, 1)
+Cmdbar.TextColor3 = Color3.fromRGB(220, 220, 220)
 Cmdbar.Text = ""
 Cmdbar.ZIndex = 10
-Cmdbar.PlaceholderText = "Command Bar"
+Cmdbar.PlaceholderText = "Command Bar..."
+Cmdbar.ClearTextOnFocus = false
+
+local _cmdbarCorner = Instance.new("UICorner")
+_cmdbarCorner.CornerRadius = UDim.new(0, 5)
+_cmdbarCorner.Parent = Cmdbar
+
+local _cmdbarStroke = Instance.new("UIStroke")
+_cmdbarStroke.Thickness = 1
+_cmdbarStroke.Color = Color3.fromRGB(45, 45, 55)
+_cmdbarStroke.Parent = Cmdbar
+
+local _cmdbarPad = Instance.new("UIPadding")
+_cmdbarPad.PaddingLeft = UDim.new(0, 6)
+_cmdbarPad.Parent = Cmdbar
 
 CMDsF.Name = "CMDs"
 CMDsF.Parent = Holder
 CMDsF.BackgroundTransparency = 1
 CMDsF.BorderSizePixel = 0
-CMDsF.Position = UDim2.new(0, 5, 0, 45)
-CMDsF.Size = UDim2.new(0, 245, 0, 175)
-CMDsF.ScrollBarImageColor3 = Color3.fromRGB(78,78,79)
+CMDsF.Position = UDim2.new(0, 8, 0, 65)
+CMDsF.Size = UDim2.new(1, -16, 1, -120)
+CMDsF.ScrollBarImageColor3 = Color3.fromRGB(0, 130, 200)
 CMDsF.BottomImage = "rbxasset://textures/ui/Scroll/scroll-middle.png"
 CMDsF.CanvasSize = UDim2.new(0, 0, 0, 0)
 CMDsF.MidImage = "rbxasset://textures/ui/Scroll/scroll-middle.png"
-CMDsF.ScrollBarThickness = 8
+CMDsF.ScrollBarThickness = 4
 CMDsF.TopImage = "rbxasset://textures/ui/Scroll/scroll-middle.png"
 CMDsF.VerticalScrollBarInset = 'Always'
 CMDsF.ZIndex = 10
@@ -436,8 +476,8 @@ cmdListLayout.Parent = CMDsF
 SettingsButton.Name = "SettingsButton"
 SettingsButton.Parent = Holder
 SettingsButton.BackgroundTransparency = 1
-SettingsButton.Position = UDim2.new(0, 230, 0, 0)
-SettingsButton.Size = UDim2.new(0, 20, 0, 20)
+SettingsButton.Position = UDim2.new(1, -52, 0, 8)
+SettingsButton.Size = UDim2.new(0, 18, 0, 18)
 SettingsButton.Image = getcustomasset("infiniteyield/assets/settings.png")
 SettingsButton.ZIndex = 10
 
@@ -445,7 +485,7 @@ ReferenceButton = Instance.new("ImageButton")
 ReferenceButton.Name = "ReferenceButton"
 ReferenceButton.Parent = Holder
 ReferenceButton.BackgroundTransparency = 1
-ReferenceButton.Position = UDim2.new(0, 212, 0, 2)
+ReferenceButton.Position = UDim2.new(1, -74, 0, 10)
 ReferenceButton.Size = UDim2.new(0, 16, 0, 16)
 ReferenceButton.Image = getcustomasset("infiniteyield/assets/reference.png")
 ReferenceButton.ZIndex = 10
@@ -453,10 +493,10 @@ ReferenceButton.ZIndex = 10
 Settings.Name = "Settings"
 Settings.Parent = Holder
 Settings.Active = true
-Settings.BackgroundColor3 = Color3.fromRGB(36, 36, 37)
+Settings.BackgroundColor3 = Color3.fromRGB(24, 24, 30)
 Settings.BorderSizePixel = 0
-Settings.Position = UDim2.new(0, 0, 0, 220)
-Settings.Size = UDim2.new(0, 250, 0, 175)
+Settings.Position = UDim2.new(0, 0, 0, 270)
+Settings.Size = UDim2.new(1, 0, 0, 200)
 Settings.ZIndex = 10
 table.insert(shade1,Settings)
 
@@ -466,11 +506,11 @@ SettingsHolder.Parent = Settings
 SettingsHolder.BackgroundTransparency = 1
 SettingsHolder.BorderSizePixel = 0
 SettingsHolder.Size = UDim2.new(1,0,1,0)
-SettingsHolder.ScrollBarImageColor3 = Color3.fromRGB(78,78,79)
+SettingsHolder.ScrollBarImageColor3 = Color3.fromRGB(0, 130, 200)
 SettingsHolder.BottomImage = "rbxasset://textures/ui/Scroll/scroll-middle.png"
 SettingsHolder.CanvasSize = UDim2.new(0, 0, 0, 235)
 SettingsHolder.MidImage = "rbxasset://textures/ui/Scroll/scroll-middle.png"
-SettingsHolder.ScrollBarThickness = 8
+SettingsHolder.ScrollBarThickness = 4
 SettingsHolder.TopImage = "rbxasset://textures/ui/Scroll/scroll-middle.png"
 SettingsHolder.VerticalScrollBarInset = 'Always'
 SettingsHolder.ZIndex = 10
@@ -478,15 +518,15 @@ table.insert(scroll,SettingsHolder)
 
 Prefix.Name = "Prefix"
 Prefix.Parent = SettingsHolder
-Prefix.BackgroundColor3 = Color3.fromRGB(46, 46, 47)
+Prefix.BackgroundColor3 = Color3.fromRGB(32, 32, 40)
 Prefix.BorderSizePixel = 0
 Prefix.BackgroundTransparency = 1
 Prefix.Position = UDim2.new(0, 5, 0, 5)
-Prefix.Size = UDim2.new(1, -10, 0, 20)
-Prefix.Font = Enum.Font.SourceSans
-Prefix.TextSize = 14
+Prefix.Size = UDim2.new(1, -10, 0, 22)
+Prefix.Font = Enum.Font.GothamMedium
+Prefix.TextSize = 12
 Prefix.Text = "Prefix"
-Prefix.TextColor3 = Color3.new(1, 1, 1)
+Prefix.TextColor3 = Color3.fromRGB(210, 210, 210)
 Prefix.TextXAlignment = Enum.TextXAlignment.Left
 Prefix.ZIndex = 10
 table.insert(shade2,Prefix)
@@ -494,31 +534,38 @@ table.insert(text1,Prefix)
 
 PrefixBox.Name = "PrefixBox"
 PrefixBox.Parent = Prefix
-PrefixBox.BackgroundColor3 = Color3.fromRGB(78, 78, 79)
+PrefixBox.BackgroundColor3 = Color3.fromRGB(45, 45, 58)
 PrefixBox.BorderSizePixel = 0
-PrefixBox.Position = UDim2.new(1, -20, 0, 0)
-PrefixBox.Size = UDim2.new(0, 20, 0, 20)
-PrefixBox.Font = Enum.Font.SourceSansBold
-PrefixBox.TextSize = 14
+PrefixBox.Position = UDim2.new(1, -22, 0, 1)
+PrefixBox.Size = UDim2.new(0, 22, 0, 20)
+PrefixBox.Font = Enum.Font.GothamBold
+PrefixBox.TextSize = 13
 PrefixBox.Text = ''
-PrefixBox.TextColor3 = Color3.new(0, 0, 0)
+PrefixBox.TextColor3 = Color3.fromRGB(0, 180, 255)
 PrefixBox.ZIndex = 10
+local _pbCorner = Instance.new("UICorner")
+_pbCorner.CornerRadius = UDim.new(0, 4)
+_pbCorner.Parent = PrefixBox
 table.insert(shade3,PrefixBox)
 table.insert(text2,PrefixBox)
 
 function makeSettingsButton(name,iconID,off)
 	local button = Instance.new("TextButton")
-	button.BackgroundColor3 = Color3.fromRGB(46, 46, 47)
+	button.BackgroundColor3 = Color3.fromRGB(32, 32, 40)
 	button.BorderSizePixel = 0
 	button.Position = UDim2.new(0,0,0,0)
-	button.Size = UDim2.new(1,0,0,25)
+	button.Size = UDim2.new(1,0,0,28)
 	button.Text = ""
 	button.ZIndex = 10
+	button.AutoButtonColor = false
+	local bCorner = Instance.new("UICorner")
+	bCorner.CornerRadius = UDim.new(0, 5)
+	bCorner.Parent = button
 	local icon = Instance.new("ImageLabel")
 	icon.Name = "Icon"
 	icon.Parent = button
-	icon.Position = UDim2.new(0,5,0,5)
-	icon.Size = UDim2.new(0,16,0,16)
+	icon.Position = UDim2.new(0,8,0.5,-7)
+	icon.Size = UDim2.new(0,14,0,14)
 	icon.BackgroundTransparency = 1
 	icon.Image = iconID
 	icon.ZIndex = 10
@@ -534,9 +581,9 @@ function makeSettingsButton(name,iconID,off)
 	label.Text = name
 	label.Position = UDim2.new(0,28,0,0)
 	label.Size = UDim2.new(1,-28,1,0)
-	label.Font = Enum.Font.SourceSans
-	label.TextColor3 = Color3.new(1, 1, 1)
-	label.TextSize = 14
+	label.Font = Enum.Font.GothamMedium
+	label.TextColor3 = Color3.fromRGB(210, 210, 210)
+	label.TextSize = 12
 	label.ZIndex = 10
 	label.TextXAlignment = Enum.TextXAlignment.Left
 	table.insert(shade2,button)
@@ -564,15 +611,15 @@ Aliases.Parent = SettingsHolder
 
 StayOpen.Name = "StayOpen"
 StayOpen.Parent = SettingsHolder
-StayOpen.BackgroundColor3 = Color3.fromRGB(46, 46, 47)
+StayOpen.BackgroundColor3 = Color3.fromRGB(32, 32, 40)
 StayOpen.BorderSizePixel = 0
 StayOpen.BackgroundTransparency = 1
-StayOpen.Position = UDim2.new(0, 5, 0, 30)
-StayOpen.Size = UDim2.new(1, -10, 0, 20)
-StayOpen.Font = Enum.Font.SourceSans
-StayOpen.TextSize = 14
+StayOpen.Position = UDim2.new(0, 5, 0, 32)
+StayOpen.Size = UDim2.new(1, -10, 0, 22)
+StayOpen.Font = Enum.Font.GothamMedium
+StayOpen.TextSize = 12
 StayOpen.Text = "Keep Menu Open"
-StayOpen.TextColor3 = Color3.new(1, 1, 1)
+StayOpen.TextColor3 = Color3.fromRGB(210, 210, 210)
 StayOpen.TextXAlignment = Enum.TextXAlignment.Left
 StayOpen.ZIndex = 10
 table.insert(shade2,StayOpen)
@@ -580,11 +627,14 @@ table.insert(text1,StayOpen)
 
 Button.Name = "Button"
 Button.Parent = StayOpen
-Button.BackgroundColor3 = Color3.fromRGB(78, 78, 79)
+Button.BackgroundColor3 = Color3.fromRGB(48, 48, 60)
 Button.BorderSizePixel = 0
-Button.Position = UDim2.new(1, -20, 0, 0)
-Button.Size = UDim2.new(0, 20, 0, 20)
+Button.Position = UDim2.new(1, -24, 0, 1)
+Button.Size = UDim2.new(0, 22, 0, 20)
 Button.ZIndex = 10
+local _btnCorner = Instance.new("UICorner")
+_btnCorner.CornerRadius = UDim.new(0, 4)
+_btnCorner.Parent = Button
 table.insert(shade3,Button)
 
 On.Name = "On"
@@ -634,23 +684,39 @@ table.insert(text1,Example)
 
 Notification.Name = randomString()
 Notification.Parent = ScaledHolder
-Notification.BackgroundColor3 = Color3.fromRGB(36, 36, 37)
+Notification.BackgroundColor3 = Color3.fromRGB(24, 24, 30)
 Notification.BorderSizePixel = 0
 Notification.Position = UDim2.new(1, -500, 1, 20)
 Notification.Size = UDim2.new(0, 250, 0, 100)
 Notification.ZIndex = 10
+local _notifCorner = Instance.new("UICorner")
+_notifCorner.CornerRadius = UDim.new(0, 8)
+_notifCorner.Parent = Notification
+local _notifStroke = Instance.new("UIStroke")
+_notifStroke.Thickness = 1
+_notifStroke.Color = Color3.fromRGB(45, 45, 55)
+_notifStroke.Parent = Notification
 table.insert(shade1,Notification)
 
 Title_2.Name = "Title"
 Title_2.Parent = Notification
-Title_2.BackgroundColor3 = Color3.fromRGB(46, 46, 47)
+Title_2.BackgroundColor3 = Color3.fromRGB(30, 30, 38)
 Title_2.BorderSizePixel = 0
-Title_2.Size = UDim2.new(0, 250, 0, 20)
-Title_2.Font = Enum.Font.SourceSans
-Title_2.TextSize = 14
+Title_2.Size = UDim2.new(1, 0, 0, 22)
+Title_2.Font = Enum.Font.GothamBold
+Title_2.TextSize = 12
 Title_2.Text = "Notification Title"
-Title_2.TextColor3 = Color3.new(1, 1, 1)
+Title_2.TextColor3 = Color3.fromRGB(0, 180, 255)
 Title_2.ZIndex = 10
+local _n2Corner = Instance.new("UICorner")
+_n2Corner.CornerRadius = UDim.new(0, 8)
+_n2Corner.Parent = Title_2
+local _n2Cap = Instance.new("Frame")
+_n2Cap.Size = UDim2.new(1,0,0,8)
+_n2Cap.Position = UDim2.new(0,0,1,-8)
+_n2Cap.BackgroundColor3 = Color3.fromRGB(30,30,38)
+_n2Cap.BorderSizePixel = 0
+_n2Cap.Parent = Title_2
 table.insert(shade2,Title_2)
 table.insert(text1,Title_2)
 
@@ -658,13 +724,15 @@ Text_2.Name = "Text"
 Text_2.Parent = Notification
 Text_2.BackgroundTransparency = 1
 Text_2.BorderSizePixel = 0
-Text_2.Position = UDim2.new(0, 5, 0, 25)
-Text_2.Size = UDim2.new(0, 240, 0, 75)
-Text_2.Font = Enum.Font.SourceSans
-Text_2.TextSize = 16
+Text_2.Position = UDim2.new(0, 8, 0, 27)
+Text_2.Size = UDim2.new(1, -16, 0, 70)
+Text_2.Font = Enum.Font.GothamMedium
+Text_2.TextSize = 12
 Text_2.Text = "Notification Text"
-Text_2.TextColor3 = Color3.new(1, 1, 1)
+Text_2.TextColor3 = Color3.fromRGB(200, 200, 200)
 Text_2.TextWrapped = true
+Text_2.TextXAlignment = Enum.TextXAlignment.Left
+Text_2.TextYAlignment = Enum.TextYAlignment.Top
 Text_2.ZIndex = 10
 table.insert(text1,Text_2)
 
@@ -743,10 +811,10 @@ table.insert(text1,Description)
 IntroBackground.Name = "IntroBackground"
 IntroBackground.Parent = Holder
 IntroBackground.Active = true
-IntroBackground.BackgroundColor3 = Color3.fromRGB(36, 36, 37)
+IntroBackground.BackgroundColor3 = Color3.fromRGB(24, 24, 30)
 IntroBackground.BorderSizePixel = 0
-IntroBackground.Position = UDim2.new(0, 0, 0, 45)
-IntroBackground.Size = UDim2.new(0, 250, 0, 175)
+IntroBackground.Position = UDim2.new(0, 0, 0, 60)
+IntroBackground.Size = UDim2.new(1, 0, 1, -60)
 IntroBackground.ZIndex = 10
 
 Logo.Name = "Logo"
@@ -3210,20 +3278,20 @@ end
 
 function maximizeHolder()
 	if StayOpen == false then
-		Holder:TweenPosition(UDim2.new(1, Holder.Position.X.Offset, 1, -220), "InOut", "Quart", 0.2, true, nil)
+		Holder:TweenPosition(UDim2.new(0, 10, 0.5, -135), "InOut", "Quart", 0.2, true, nil)
 	end
 end
 
-minimizeNum = -20
+minimizeNum = -260
 function minimizeHolder()
 	if StayOpen == false then
-		Holder:TweenPosition(UDim2.new(1, Holder.Position.X.Offset, 1, minimizeNum), "InOut", "Quart", 0.5, true, nil)
+		Holder:TweenPosition(UDim2.new(0, minimizeNum, 0.5, -135), "InOut", "Quart", 0.5, true, nil)
 	end
 end
 
 function cmdbarHolder()
 	if StayOpen == false then
-		Holder:TweenPosition(UDim2.new(1, Holder.Position.X.Offset, 1, -45), "InOut", "Quart", 0.5, true, nil)
+		Holder:TweenPosition(UDim2.new(0, 10, 0.5, -135), "InOut", "Quart", 0.5, true, nil)
 	end
 end
 
@@ -4241,10 +4309,7 @@ function CamViewport()
 end
 
 function UpdateToViewport()
-	if Holder.Position.X.Offset < -CamViewport() then
-		Holder:TweenPosition(UDim2.new(1, -CamViewport(), Holder.Position.Y.Scale, Holder.Position.Y.Offset), "InOut", "Quart", 0.04, true, nil)
-		Notification:TweenPosition(UDim2.new(1, -CamViewport() + 250, Notification.Position.Y.Scale, Notification.Position.Y.Offset), "InOut", "Quart", 0.04, true, nil)
-	end
+	-- Left-anchored panel: no right-boundary enforcement needed
 end
 CameraChanged = workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(UpdateToViewport)
 
@@ -4266,32 +4331,11 @@ function dragMain(dragpoint,gui)
 		local dragStart = Vector3.new(0,0,0)
 		local startPos
 		local function update(input)
-			local pos = -250
 			local delta = input.Position - dragStart
-			if startPos.X.Offset + delta.X <= -500 then
-				local Position = UDim2.new(1, -250, Notification.Position.Y.Scale, Notification.Position.Y.Offset)
-				TweenService:Create(Notification, TweenInfo.new(.20), {Position = Position}):Play()
-				pos = 250
-			else
-				local Position = UDim2.new(1, -500, Notification.Position.Y.Scale, Notification.Position.Y.Offset)
-				TweenService:Create(Notification, TweenInfo.new(.20), {Position = Position}):Play()
-				pos = -250
-			end
-			if startPos.X.Offset + delta.X <= -250 and -CamViewport() <= startPos.X.Offset + delta.X then
-				local Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, gui.Position.Y.Scale, gui.Position.Y.Offset)
-				TweenService:Create(gui, TweenInfo.new(.20), {Position = Position}):Play()
-				local Position2 = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X + pos, Notification.Position.Y.Scale, Notification.Position.Y.Offset)
-				TweenService:Create(Notification, TweenInfo.new(.20), {Position = Position2}):Play()
-			elseif startPos.X.Offset + delta.X > -500 then
-				local Position = UDim2.new(1, -250, gui.Position.Y.Scale, gui.Position.Y.Offset)
-				TweenService:Create(gui, TweenInfo.new(.20), {Position = Position}):Play()
-			elseif -CamViewport() > startPos.X.Offset + delta.X then
-				gui:TweenPosition(UDim2.new(1, -CamViewport(), gui.Position.Y.Scale, gui.Position.Y.Offset), "InOut", "Quart", 0.04, true, nil)
-				local Position = UDim2.new(1, -CamViewport(), gui.Position.Y.Scale, gui.Position.Y.Offset)
-				TweenService:Create(gui, TweenInfo.new(.20), {Position = Position}):Play()
-				local Position2 = UDim2.new(1, -CamViewport() + 250, Notification.Position.Y.Scale, Notification.Position.Y.Offset)
-				TweenService:Create(Notification, TweenInfo.new(.20), {Position = Position2}):Play()
-			end
+			local newX = startPos.X.Offset + delta.X
+			local newY = startPos.Y.Offset + delta.Y
+			local Position = UDim2.new(startPos.X.Scale, newX, startPos.Y.Scale, newY)
+			TweenService:Create(gui, TweenInfo.new(.20), {Position = Position}):Play()
 		end
 		dragpoint.InputBegan:Connect(function(input)
 			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -7781,14 +7825,14 @@ addcmd('hideiy',{},function(args, speaker)
 		StayOpen = false
 		On.BackgroundTransparency = 1
 	end
-	minimizeNum = 0
+	minimizeNum = -260
 	minimizeHolder()
 	if not (args[1] and tostring(args[1]) == 'nonotify') then notify('IY Hidden','You can press the prefix key to access the command bar') end
 end)
 
 addcmd('showiy',{'unhideiy'},function(args, speaker)
 	isHidden = false
-	minimizeNum = -20
+	minimizeNum = -260
 	if wasStayOpen then
 		maximizeHolder()
 		StayOpen = true
